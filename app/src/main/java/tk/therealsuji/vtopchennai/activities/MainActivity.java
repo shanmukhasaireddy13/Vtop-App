@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
@@ -48,6 +49,7 @@ import tk.therealsuji.vtopchennai.fragments.HomeFragment;
 import tk.therealsuji.vtopchennai.fragments.PerformanceFragment;
 import tk.therealsuji.vtopchennai.fragments.ProfileFragment;
 import tk.therealsuji.vtopchennai.fragments.dialogs.UpdateDialogFragment;
+import tk.therealsuji.vtopchennai.fragments.dialogs.WhatsNewBottomSheetFragment;
 import tk.therealsuji.vtopchennai.helpers.AppDatabase;
 import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 import tk.therealsuji.vtopchennai.helpers.VTOPHelper;
@@ -375,7 +377,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         /*
-            Check for updates
+            Check if "What's New" should be shown on first run of this version
+         */
+        SharedPreferences prefs = SettingsRepository.getSharedPreferences(this);
+        int lastSeenVersionCode = prefs.getInt("last_seen_version_code", 0);
+        if (lastSeenVersionCode < BuildConfig.VERSION_CODE) {
+            prefs.edit().putInt("last_seen_version_code", BuildConfig.VERSION_CODE).apply();
+            WhatsNewBottomSheetFragment.show(getSupportFragmentManager());
+        }
+
+        /*
+            Check for updates from GitHub Releases
          */
         Context context = this;
         SettingsRepository.fetchAboutJson(true)
@@ -388,9 +400,9 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onNext(@NonNull JSONObject about) {
                         try {
-                            int versionCode = about.getInt("versionCode");
-                            String versionName = about.getString("tagName");
-                            String releaseNotes = about.getString("releaseNotes");
+                            int versionCode = about.optInt("versionCode", 0);
+                            String versionName = about.optString("tagName", "");
+                            String releaseNotes = about.optString("releaseNotes", "");
 
                             if (versionCode > BuildConfig.VERSION_CODE) {
                                 FragmentManager fragmentManager = getSupportFragmentManager();

@@ -141,9 +141,9 @@ public class LoginActivity extends AppCompatActivity {
                     @Override
                     public void onNext(@NonNull JSONObject about) {
                         try {
-                            int versionCode = about.getInt("versionCode");
-                            String versionName = about.getString("tagName");
-                            String releaseNotes = about.getString("releaseNotes");
+                            int versionCode = about.optInt("versionCode", 0);
+                            String versionName = about.optString("tagName", "");
+                            String releaseNotes = about.optString("releaseNotes", "");
 
                             if (versionCode > BuildConfig.VERSION_CODE) {
                                 FragmentManager fragmentManager = getSupportFragmentManager();

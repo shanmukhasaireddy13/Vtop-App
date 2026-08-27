@@ -27,10 +27,20 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.firebase.analytics.FirebaseAnalytics;
 
+import androidx.annotation.NonNull;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.disposables.Disposable;
+import org.json.JSONObject;
+
+import tk.therealsuji.vtopchennai.BuildConfig;
 import tk.therealsuji.vtopchennai.R;
 import tk.therealsuji.vtopchennai.activities.LoginActivity;
 import tk.therealsuji.vtopchennai.adapters.AnnouncementItemAdapter;
 import tk.therealsuji.vtopchennai.adapters.ProfileGroupAdapter;
+import tk.therealsuji.vtopchennai.fragments.dialogs.UpdateDialogFragment;
+import tk.therealsuji.vtopchennai.fragments.dialogs.WhatsNewBottomSheetFragment;
 import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 
 public class ProfileFragment extends Fragment {
@@ -237,6 +247,55 @@ public class ProfileFragment extends Fragment {
                     null
             ),
             new ItemData(
+                    R.drawable.ic_whats_new,
+                    R.string.whats_new,
+                    context -> WhatsNewBottomSheetFragment.show(getParentFragmentManager()),
+                    null
+            ),
+            new ItemData(
+                    R.drawable.ic_update_available,
+                    R.string.check_for_updates,
+                    context -> {
+                        Toast.makeText(context, "Checking for updates...", Toast.LENGTH_SHORT).show();
+                        SettingsRepository.fetchAboutJson(true)
+                                .subscribe(new Observer<JSONObject>() {
+                                    @Override
+                                    public void onSubscribe(@NonNull Disposable d) {
+                                    }
+
+                                    @Override
+                                    public void onNext(@NonNull JSONObject about) {
+                                        try {
+                                            int versionCode = about.optInt("versionCode", 0);
+                                            String versionName = about.optString("tagName", "");
+                                            String releaseNotes = about.optString("releaseNotes", "");
+
+                                            if (versionCode > BuildConfig.VERSION_CODE) {
+                                                FragmentManager fragmentManager = getParentFragmentManager();
+                                                FragmentTransaction transaction = fragmentManager.beginTransaction();
+                                                transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
+                                                transaction.add(android.R.id.content, UpdateDialogFragment.newInstance(versionName, releaseNotes)).addToBackStack(null).commit();
+                                            } else {
+                                                Toast.makeText(context, "You're on the latest version (v" + BuildConfig.VERSION_NAME + ")!", Toast.LENGTH_SHORT).show();
+                                            }
+                                        } catch (Exception e) {
+                                            Toast.makeText(context, "You're on the latest version (v" + BuildConfig.VERSION_NAME + ")!", Toast.LENGTH_SHORT).show();
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onError(@NonNull Throwable e) {
+                                        Toast.makeText(context, "Unable to check updates. Please verify your connection.", Toast.LENGTH_SHORT).show();
+                                    }
+
+                                    @Override
+                                    public void onComplete() {
+                                    }
+                                });
+                    },
+                    null
+            ),
+            new ItemData(
                     R.drawable.ic_privacy,
                     R.string.privacy,
                     context -> SettingsRepository.openWebViewActivity(
@@ -340,9 +399,9 @@ public class ProfileFragment extends Fragment {
     private final ItemData[] announcementItems = {
             new ItemData(
                     R.drawable.ic_whats_new,
-                    "VIT Student is now Open Source!",
-                    "Click to view the source code.",
-                    context -> SettingsRepository.openBrowser(context, SettingsRepository.GITHUB_BASE_URL)
+                    "What's New in this Update",
+                    "Tap to explore latest features & improvements.",
+                    context -> WhatsNewBottomSheetFragment.show(getParentFragmentManager())
             )
     };
 

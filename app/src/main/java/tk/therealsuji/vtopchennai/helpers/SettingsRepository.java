@@ -80,15 +80,18 @@ import tk.therealsuji.vtopchennai.receivers.TimetableNotificationReceiver;
 import tk.therealsuji.vtopchennai.receivers.SmartDndReceiver;
 
 public class SettingsRepository {
-    public static final String APP_BASE_URL = "https://vtopchennai.therealsuji.tk";
-    public static final String APP_ABOUT_URL = APP_BASE_URL + "/about.json";
-    public static final String APP_PRIVACY_URL = APP_BASE_URL + "/privacy-policy";
+    public static final String GITHUB_OWNER = "shanmukhasaireddy13";
+    public static final String GITHUB_REPO = "Vtop-App";
+    public static final String GITHUB_BASE_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
+    public static final String GITHUB_RELEASES_URL = GITHUB_BASE_URL + "/releases";
+    public static final String GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
+    public static final String GITHUB_FEATURE_URL = GITHUB_BASE_URL + "/issues/new";
+    public static final String GITHUB_ISSUE_URL = GITHUB_BASE_URL + "/issues/new";
 
-    public static final String DEVELOPER_BASE_URL = "https://therealsuji.tk";
-
-    public static final String GITHUB_BASE_URL = "https://github.com/therealsujitk/android-vtop-chennai";
-    public static final String GITHUB_FEATURE_URL = GITHUB_BASE_URL + "/issues";
-    public static final String GITHUB_ISSUE_URL = GITHUB_BASE_URL + "/issues";
+    public static final String APP_BASE_URL = GITHUB_BASE_URL;
+    public static final String APP_ABOUT_URL = GITHUB_LATEST_RELEASE_API;
+    public static final String APP_PRIVACY_URL = GITHUB_BASE_URL + "/blob/main/README.md";
+    public static final String DEVELOPER_BASE_URL = "https://github.com/" + GITHUB_OWNER;
 
     public static final String MOODLE_BASE_URL = "https://lms.vit.ac.in";
     public static final String MOODLE_LOGIN_PATH = "/login/token.php";
@@ -227,32 +230,69 @@ public class SettingsRepository {
 
     public static Observable<JSONObject> fetchAboutJson(boolean useVersion) {
         return Observable.fromCallable(() -> {
+                    HttpURLConnection httpURLConnection = null;
                     try {
-                        StringBuilder sb = new StringBuilder();
-                        URL url = new URL(SettingsRepository.APP_ABOUT_URL + (useVersion ? "?v=" + BuildConfig.VERSION_NAME : ""));
-                        HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
-                        InputStream in = httpURLConnection.getInputStream();
-                        InputStreamReader reader = new InputStreamReader(in);
-                        int data = reader.read();
+                        URL url = new URL(GITHUB_LATEST_RELEASE_API);
+                        httpURLConnection = (HttpURLConnection) url.openConnection();
+                        httpURLConnection.setRequestProperty("User-Agent", "VTOP-App/" + BuildConfig.VERSION_NAME);
+                        httpURLConnection.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                        httpURLConnection.setConnectTimeout(8000);
+                        httpURLConnection.setReadTimeout(8000);
 
-                        while (data != -1) {
-                            char current = (char) data;
-                            sb.append(current);
-                            data = reader.read();
+                        int responseCode = httpURLConnection.getResponseCode();
+                        if (responseCode == HttpURLConnection.HTTP_OK) {
+                            InputStream in = httpURLConnection.getInputStream();
+                            java.io.BufferedReader reader = new java.io.BufferedReader(new InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8));
+                            StringBuilder sb = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                sb.append(line).append("\n");
+                            }
+                            reader.close();
+
+                            JSONObject release = new JSONObject(sb.toString());
+                            String tagName = release.optString("tag_name", "");
+                            String releaseNotes = release.optString("body", "Bug fixes and performance improvements.");
+                            String htmlUrl = release.optString("html_url", GITHUB_RELEASES_URL);
+
+                            JSONObject result = new JSONObject();
+                            result.put("tagName", tagName);
+                            result.put("releaseNotes", releaseNotes);
+                            result.put("downloadUrl", htmlUrl);
+
+                            int computedVersionCode = parseVersionToCode(tagName);
+                            result.put("versionCode", computedVersionCode);
+
+                            return result;
                         }
-
-                        String result = sb.toString();
-                        return new JSONObject(result);
                     } catch (Exception ignored) {
-                        return new JSONObject();
+                    } finally {
+                        if (httpURLConnection != null) {
+                            httpURLConnection.disconnect();
+                        }
                     }
+                    return new JSONObject();
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
+    public static int parseVersionToCode(String version) {
+        if (version == null) return 0;
+        String clean = version.replaceAll("[^0-9.]", "").trim();
+        String[] parts = clean.split("\\.");
+        int code = 0;
+        try {
+            if (parts.length >= 1) code += Integer.parseInt(parts[0]) * 10000;
+            if (parts.length >= 2) code += Integer.parseInt(parts[1]) * 100;
+            if (parts.length >= 3) code += Integer.parseInt(parts[2]);
+        } catch (NumberFormatException ignored) {
+        }
+        return code;
+    }
+
     public static void openDownloadPage(Context context) {
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(APP_BASE_URL));
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_RELEASES_URL));
         context.startActivity(browserIntent);
     }
 

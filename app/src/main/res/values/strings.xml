@@ -158,7 +158,7 @@
     <string name="faculty">Faculty: &lt;b>%s&lt;/b></string>
     <string name="venue">Venue: &lt;b>%s&lt;/b></string>
     <string name="date">Date: &lt;b>%s&lt;/b></string>
-    <string name="timings">Timings: &lt;b>%s - %s&lt;/b></string>
+    <string name="timings">Timings: &lt;b>%1$s - %2$s&lt;/b></string>
     <string name="attendance">Attendance</string>
     <string name="na">NA</string>
     <string name="permission_granted">Permission Granted</string>
@@ -187,7 +187,7 @@
     <string name="today_menu">Today\'s Menu</string>
     <string name="allowed_rooms">Allowed Rooms:</string>
     <string name="active_slots">Active Slots:</string>
-    <string name="menu_alternating_week">Week %d • Menu %d (%s Week)</string>
+    <string name="menu_alternating_week">Week %1$d • Menu %2$d (%3$s Week)</string>
     <string name="hostel_mess_menu">Hostel Mess Menu</string>
     <string name="breakfast_timings">07:00 AM – 09:00 AM</string>
     <string name="breakfast_weekend_timings">07:30 AM – 09:30 AM (Weekend)</string>
@@ -207,4 +207,6 @@
     <string name="save_room">Save &amp; View Schedule</string>
     <string name="edit_room_format">Edit Room (%s)</string>
     <string name="next_laundry_date_label">NEXT LAUNDRY SCHEDULE</string>
+    <string name="whats_new">What\'s New</string>
+    <string name="check_for_updates">Check for Updates</string>
 </resources>
