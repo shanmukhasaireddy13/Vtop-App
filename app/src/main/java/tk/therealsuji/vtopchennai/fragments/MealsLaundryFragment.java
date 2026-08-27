@@ -67,6 +67,8 @@ public class MealsLaundryFragment extends Fragment {
     private TextView textMealStatusBadge;
     private LinearLayout layoutMealDishesContainer;
     private TextView textMealContent;
+    private View layoutMealSpecialNotes;
+    private TextView textMealSpecialNotes;
 
     // View References for Laundry
     private TextInputEditText editTextRoomNumber;
@@ -203,6 +205,8 @@ public class MealsLaundryFragment extends Fragment {
         textMealStatusBadge = view.findViewById(R.id.text_meal_status_badge);
         layoutMealDishesContainer = view.findViewById(R.id.layout_meal_dishes_container);
         textMealContent = view.findViewById(R.id.text_meal_content);
+        layoutMealSpecialNotes = view.findViewById(R.id.layout_meal_special_notes);
+        textMealSpecialNotes = view.findViewById(R.id.text_meal_special_notes);
 
         // Date Picker Trigger
         View.OnClickListener openDatePickerListener = v -> showDatePickerDialog();
@@ -280,7 +284,7 @@ public class MealsLaundryFragment extends Fragment {
 
     private void updateDayAndMenu() {
         int weekOfYear = selectedCalendar.get(Calendar.WEEK_OF_YEAR);
-        int menuNum = (weekOfYear % 2 != 0) ? 1 : 2;
+        int menuNum = (weekOfYear % 2 == 0) ? 1 : 2;
         currentMenuKey = "menu_" + menuNum;
 
         // Format Date e.g. "Thursday, 27 Aug"
@@ -333,6 +337,9 @@ public class MealsLaundryFragment extends Fragment {
     private void renderMealContent() {
         if (hostelData == null || currentMenuKey == null) return;
 
+        int dayOfWeek = selectedCalendar.get(Calendar.DAY_OF_WEEK) - 1; // 0 = Sunday, 6 = Saturday
+        boolean isWeekend = (dayOfWeek == 0 || dayOfWeek == 6);
+
         int mealTitleRes;
         int timingRes;
         int iconRes;
@@ -341,13 +348,13 @@ public class MealsLaundryFragment extends Fragment {
         switch (selectedMealIndex) {
             case 0:
                 mealTitleRes = R.string.tab_breakfast;
-                timingRes = R.string.breakfast_timings;
+                timingRes = isWeekend ? R.string.breakfast_weekend_timings : R.string.breakfast_timings;
                 iconRes = R.drawable.ic_breakfast;
                 mealField = "breakfast";
                 break;
             case 1:
                 mealTitleRes = R.string.tab_lunch;
-                timingRes = R.string.lunch_timings;
+                timingRes = isWeekend ? R.string.lunch_weekend_timings : R.string.lunch_timings;
                 iconRes = R.drawable.ic_lunch;
                 mealField = "lunch";
                 break;
@@ -370,6 +377,18 @@ public class MealsLaundryFragment extends Fragment {
         if (textMealTiming != null) textMealTiming.setText(timingRes);
         if (imageMealIcon != null) imageMealIcon.setImageResource(iconRes);
 
+        if (layoutMealSpecialNotes != null && textMealSpecialNotes != null) {
+            if (selectedMealIndex == 1) {
+                layoutMealSpecialNotes.setVisibility(View.VISIBLE);
+                textMealSpecialNotes.setText(R.string.lunch_notes);
+            } else if (selectedMealIndex == 3) {
+                layoutMealSpecialNotes.setVisibility(View.VISIBLE);
+                textMealSpecialNotes.setText(R.string.dinner_notes);
+            } else {
+                layoutMealSpecialNotes.setVisibility(View.GONE);
+            }
+        }
+
         // Update status badge
         Calendar todayCal = Calendar.getInstance();
         boolean isSameDay = (todayCal.get(Calendar.YEAR) == selectedCalendar.get(Calendar.YEAR)
@@ -384,7 +403,6 @@ public class MealsLaundryFragment extends Fragment {
         }
 
         try {
-            int dayOfWeek = selectedCalendar.get(Calendar.DAY_OF_WEEK) - 1; // 0 = Sunday
             String dayKey = DAY_KEYS[dayOfWeek];
 
             JSONObject mealsObj = hostelData.getJSONObject("meals");

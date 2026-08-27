@@ -35,90 +35,90 @@
   "meals": {
     "menu_1": {
       "monday": {
-        "breakfast": "Paav Bhaji, Uthappam, Pongal, Sambar, Coconut Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Ajwain, White Rice, Tomato Sambar, Rasam, Curd, Aloo Gobi Masala, Bottleguard Poriyal, Watermelon",
+        "breakfast": "Poori, Aloo Masala, Semiya Upma, Coconut Chutney, Masala Omelette (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Fry, White Rice, Tomato Rice, Sambar, Rasam, Curd, Onion Rings, Mix Veg Gravy, Bottle Gourd Poriyal, Papaya",
+        "snacks": "Masala Peanuts, Tea, Coffee, Milk",
+        "dinner": "Phulka, Mughalai Egg Curry, Uthapam, Chutney, Sambar, Rice, Rasam, Ice Cream (Strawberry/Vanilla)"
+      },
+      "tuesday": {
+        "breakfast": "Idly, Podi and Oil, Mix Veg Rava Khichdi, Sambar, Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Tadka, White Rice, Rasam, Curd, Potato Chips, Bisibilla Bath, Aloo Green Matar Gravy, Watermelon",
+        "snacks": "Sweetcorn, Tea, Coffee, Milk",
+        "dinner": "Chapathi, Dal, Bhindi Curry, White Rice, Rasam, Mix Veg Poriyal, Idly + Podi + Oil, Mint Chutney, Sambar, Parupu Payasam"
+      },
+      "wednesday": {
+        "breakfast": "Thin Dosa, Namkin Poha, Sambar, Coriander Chutney, Scrambled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, White Rice, Veg Pulao, Sambar, Rasam, Butter Chicken, Butter Milk, Fryums, Aloo Gobi, Banana",
+        "snacks": "Veg Puffs (1 no.), Sauce, Tea, Coffee, Milk",
+        "dinner": "Chapathi, Peas Soya Gravy, Rice, Andhra Dhal, Vazhaikai Poriyal, Rasam, Sambar, Vegetable Rava Kitchadi, Coconut Chutney, Curd"
+      },
+      "thursday": {
+        "breakfast": "Paneer Paratha, Curd, Pongal, Sambar, Coconut Chutney, Egg Bhurji (2 Nos), BBJ, Tea, Coffee, Milk, Pickle",
+        "lunch": "Phulka, Dal Masala, White Rice, Veg Biryani, Sambar, Rasam, Butter Milk, Onion Rings, Aloo Jeera, Mutter Paneer, Muskmelon",
+        "snacks": "Banana Bhaji (2 nos), Chutney, Tea, Coffee, Milk",
+        "dinner": "Puri, White Channa Masala, Peas Pulao, White Rice, Rasam, Poriyal, Cold Badam Milk"
+      },
+      "friday": {
+        "breakfast": "Kal Dosa, Vada, Sambar, Onion Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Lasooni, White Rice, Ghee Rice, Rasam, Wheel Chips, Chicken 65 + Plain Gravy / Chicken Tikka Masala, Poriyal, Watermelon, Lemon Juice",
+        "snacks": "Tea Cake, Tea, Coffee, Milk",
+        "dinner": "Phulka, Aloo Matar Masala, Dal, White Rice, Raddish Sambar, Carrot Poriyal, Rasam, Lemon Rice, Chocolate Milkshake"
+      },
+      "saturday": {
+        "breakfast": "Aloo Paratha, Pickle, Vegetable Uppuma, Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Maharani, White Rice, Pudina Rice, Rasam, Karakozembu, Dahi Vada (less sweet), Mix Veg Poriyal, Fryums, Papaya",
+        "snacks": "Onion Samosa (2 medium), Tea, Coffee, Milk",
+        "dinner": "Pulka, Dum Aloo, Millet Idli, Sambar, Chutney, White Rice, Rasam, Poriyal, Bread Halwa"
+      },
+      "sunday": {
+        "breakfast": "Poori, Aloo Bhaji, Semiya Upma, Coconut Chutney, Egg Bhurji, BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Tadka, White Rice, Rasam, Papad, Onion Raita, Chicken Biryani, Banaras Baigan, Banana, Lemon Juice",
+        "snacks": "Pani Poori, Tea, Coffee, Milk",
+        "dinner": "Chapathi, Chana Masala, Rawa Khichdi, White Rice, Sambar, Rasam, Cabbage Beans Poriyal, Butter Milk"
+      }
+    },
+    "menu_2": {
+      "monday": {
+        "breakfast": "Pav Bhaji, Uthapam, Pongal, Sambar, Coconut Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Ajwain, White Rice, Tomato Rice, Sambar, Rasam, Curd, Aloo Gobi Masala, Bottle Gourd Poriyal, Watermelon",
         "snacks": "Veg Cutlet (2 nos), Sauce, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Chettinadu Egg Masala, Uthappam/Idly, Sambar, Rice, Rasam, Ice Cream (VANILLA/CHOCOLATE)"
+        "dinner": "Phulka, Chettinadu Egg Masala, Uthapam, Chutney, Sambar, Rice, Rasam, Ice Cream (Vanilla/Chocolate)"
       },
       "tuesday": {
         "breakfast": "Mixed Veg Paratha, Curd, Semiya Khichdi, Coconut Chutney, Sambar, Masala Omelette (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Thadka, White Rice, Rasam, Curd, Cabbage Poriyal, Butter Milk, Bisibella Bath, Potato Chips, Mushroom Peas Masala, Muskmelon",
-        "snacks": "Veg Samosa (2 medium size), Imli Sauce, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Veg Koftha, White Rice, Rasam, Mix Veg Poriyal, Idly+Podi+oil, Mint Chutney, Sambar, Curd, Gulab Jamun"
+        "lunch": "Phulka, Dal Tadka, White Rice, Rasam, Cabbage Poriyal, Butter Milk, Bisibilla Huliyana, Potato Chips, Mushroom Peas Masala, Muskmelon",
+        "snacks": "Veg Samosa (2 medium), Imly Sauce, Coffee, Milk",
+        "dinner": "Chapathi, Veg Kofftha, White Rice, Rasam, Mix Veg Poriyal, Idly + Podi + Oil, Mint Chutney, Sambar, Curd, Gulab Jamun"
       },
       "wednesday": {
         "breakfast": "Thin Masala Dosa, Namkin Poha, Sambar, Tomato Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
         "lunch": "Phulka, White Rice, Ghee Rice, Sambar, Rasam, Papad, Pepper Chicken, Poriyal, Banana, Lemon Juice",
         "snacks": "Veg Puff (1 no.), Sauce, Tea, Coffee, Milk",
-        "dinner": "Chapathi, peas Soya gravy, Rice, Andhra Dhal, Vazhaikai poriyal, Rasam, Vegetable Rava kitchadi, Coconet Chutney, Curd"
+        "dinner": "Chapathi, Peas Soya Gravy, Rice, Andhra Dhal, Vazhaikai Poriyal, Rasam, Vegetable Rava Kitchadi, Coconut Chutney, Curd"
       },
       "thursday": {
-        "breakfast": "PodiDosa, Rawa Khicdi, Sambar, Chutney, Egg Bhurji (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Harar Dal, White Rice, Sambar, Rasam, Veg. Biryani, Raitha, Poriyal, Paneer Shahi Masala, Fruits: Muskmelon",
-        "snacks": "Banana Bajji (2 no.s), Coconut Chutney, Tea, Coffee, Milk",
-        "dinner": "Poori, White channa masala, Peas Pulao, White Rice, Rasam, Snake Gourd Poriyal, Sambar, Lassi"
+        "breakfast": "Podi Dosa, Rawa Khichdi, Sambar, Chutney, Egg Bhurji (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Harar Dal, White Rice, Sambar, Rasam, Veg Biryani, Raitha, Poriyal, Paneer Shahi Masala, Muskmelon",
+        "snacks": "Banana Bajji (2 nos), Coconut Chutney, Tea, Coffee, Milk",
+        "dinner": "Poori, White Channa Masala, Peas Pulao, White Rice, Rasam, Snake Gourd Poriyal, Sambar, Lassi"
       },
       "friday": {
-        "breakfast": "Paneer Paratha, Curd, Pickle, Kitchadi, Mint Chutney, Sambar, BoiledEgg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Rajasthani, White Rice, Veg. Pulao, Rasam, Butter Milk, Papad, Tandoori chicken, Plain Gravy, Fruits: watermelon, Lemon Juice",
+        "breakfast": "Paneer Paratha, Curd, Pickle, Kitchadi, Mint Chutney, Sambar, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Rajasthani, White Rice, Veg Pulao, Rasam, Butter Milk, Papad, Tandoori Chicken, Plain Gravy, Watermelon, Lemon Juice",
         "snacks": "Cake, Tea, Coffee, Milk",
-        "dinner": "Chapathi, green peas gravy, French Fries, White Rice, Idly, Raddish Sambar, Carrot Poriyal, Rasam, STRAWBERRY MILKSHAKE"
+        "dinner": "Phulka, Green Peas Gravy, French Fries, White Rice, Idly, Radish Sambar, Carrot Poriyal, Rasam, Strawberry Milkshake"
       },
       "saturday": {
-        "breakfast": "Idly, Sambar, Kara Chutney, Semiya Kitchdi, Masala Omelette (2 no.s), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Thadka, White Rice, Lemon Rice, Rasam, Dahi vada(Less sweet) / Kodi Pakoda, Papad, Kara Kozhambu, Keerai Kootu, Banana, Butter Milk",
-        "snacks": "Masala Vada (2 medium size), Chutney, Tea, Coffee, Milk",
-        "dinner": "Pulka, Dal makhani, Millet dosa, Sambar, Chutney, White Rice, Rasam, Buttermilk, Poriyal, Mysore Pak"
+        "breakfast": "Idly, Sambar, Kara Chutney, Semiya Kitchdi, Masala Omelette (2 Nos), BBJ, Tea, Coffee, Milk",
+        "lunch": "Phulka, Dal Tadka, White Rice, Lemon Rice, Rasam, Dahi Vada (less sweet) / Kadi Pakoda, Papad, Kara Kozhambu, Keerai Kootu, Banana, Butter Milk",
+        "snacks": "Masala Vada (2 medium), Chutney, Tea, Coffee, Milk",
+        "dinner": "Pulka, Dal Makhani, Millet Dosa, Sambar, Chutney, White Rice, Rasam, Buttermilk, Poriyal, Mysore Pak"
       },
       "sunday": {
         "breakfast": "Gobi Paratha, Curd, Pongal, Chutney, Sambar, Coconut Chutney, Omelette (2 Nos), BBJ, Tea, Coffee, Milk",
         "lunch": "Phulka, Harar Dal, White Rice, Rasam, Fryums, Onion Raitha, Chicken Biryani, Brinjal Fry, Banana",
         "snacks": "Dahi Papdi Chat / Channa Chat, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Soyabeen Aloo gravy, Rawa Khicdi, White Rice, Sambar, Rasam + Poriyal, Butter Milk"
-      }
-    },
-    "menu_2": {
-      "monday": {
-        "breakfast": "Poori, Aloo Masala, Semiya Upma, Coconut Chutney, Masala Omelette (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Fry, White Rice, Tomato Sambar, Rasam, Curd, Onion Rings, Meal Maker Gravy, Bottle Guard Poriyal, Fruits: Papaya",
-        "snacks": "Masala Peanuts, Tea, Coffee, Milk",
-        "dinner": "Phulka, Mughlai Chicken, Uthappam, Chutney, Sambar, Rice, Rasam, Ice Cream (STRAWBERRY/VANILLA)"
-      },
-      "tuesday": {
-        "breakfast": "Idly, Podi and Oil, Mix Veg. Khichdi, Sambar, Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Thadka, White Rice, Rasam, Curd, Potato Chips, Bisibella Bath, Aloo Green Matar Gravy, Fruits: Watermelon",
-        "snacks": "Sweetcorn, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Dal, Bhindi Curry, White Rice, Rasam, Mix Veg Poriyal, Idly+Podi+oil, Mint chutney, Sambar, Parupu payasam"
-      },
-      "wednesday": {
-        "breakfast": "Thin Dosa, Namkin Poha, Sambar, Corriander Chutney, Scrambeled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, White Rice, Veg. Pulao, Sambar, Rasam, Butter Chicken, Butter Milk, Fryums, Aloo Gobi, Fruits: Banana",
-        "snacks": "Veg Puffs (1 no.), Sauce, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Peas Soya gravy, Rice, Andhra Dhal, Vazhaikai poriyal, Rasam, Sambar, Vegetable Rava kitchadi, Coconet Chutney, Curd"
-      },
-      "thursday": {
-        "breakfast": "Paneer Paratha, Curd, Pongal, Sambar, Coconut chutney, Egg bhurji (2 Nos), BBJ, Tea, Coffee, Milk, Pickle",
-        "lunch": "Phulka, Dal Masala, White Rice, Veg Biryani, Sambar, Rasam, Butter Milk, Onion Rings, Aloo Jeera, Mutter Paneer, Fruits: Musk Melon",
-        "snacks": "Banana bhaji (2 no.s), Chutney, Tea, Coffee, Milk",
-        "dinner": "Puri, White channa masala, Peas Pulao, White Rice, Rasam, Poriyal, Cold Badam Milk"
-      },
-      "friday": {
-        "breakfast": "Kal Dosa, Vada, Sambar, Onion Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Lasoni, White Rice, Ghee Rice, Rasam, Wheel Chips, Chicken 65 - Plain Gravy/Chicken Tikka Masala, Poriyal, Fruits: Water Melon, Lemon Juice",
-        "snacks": "Tea Cake, Tea, Coffee, Milk",
-        "dinner": "Phulka, Aloo Matar masala, Dal, White rice, Raddish sambar, carrot poriyal, Rasam, Lemon rice, Chocolate milkshake"
-      },
-      "saturday": {
-        "breakfast": "Aloo Paratha, Pickle, Vegetable Uppuma, Chutney, Boiled Egg (2 Nos), BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal Maharani, White Rice, Pudina Rice, Rasam, Karakozembu, Dahi vada (Less sweet), Mix veg Poriyal, Fryums, Fruits: Papaya",
-        "snacks": "Onion Samosa (2 medium size), Tea, Coffee, Milk",
-        "dinner": "Pulka, Dum Aloo, Millet Idli, Sambar, Chutney, White Rice, Rasam, pooriyal, Bread halwa"
-      },
-      "sunday": {
-        "breakfast": "Poori, Aloo bhaji, Semiya upma, Coconet Chutney, Egg Bhurji, BBJ, Tea, Coffee, Milk",
-        "lunch": "Phulka, Dal tadka, White Rice, Rasam, Papad, Onion Raitha, Chicken Biryani, Banaras Baigan, Fruits: Banana, Lemon Juice",
-        "snacks": "Pani Poori, Tea, Coffee, Milk",
-        "dinner": "Chapathi, Chana masala, Rawa Khicdi, White Rice, Sambar, Rasam, Cabbage beans Poriyal, Butter Milk"
+        "dinner": "Chapathi, Soyabean Aloo Gravy, Rawa Khichdi, White Rice, Sambar, Rasam + Poriyal, Butter Milk"
       }
     }
   }

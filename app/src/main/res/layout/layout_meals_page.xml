@@ -225,6 +225,37 @@
                 android:textSize="15sp"
                 android:visibility="gone" />
 
+            <!-- Special Meal Notes (e.g. Ghee/Podi for Lunch, Hot Milk/Salad for Dinner) -->
+            <LinearLayout
+                android:id="@+id/layout_meal_special_notes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/background_dish_item"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_info"
+                    app:tint="?attr/colorPrimary" />
+
+                <TextView
+                    android:id="@+id/text_meal_special_notes"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    android:textStyle="italic" />
+            </LinearLayout>
+
         </LinearLayout>
 
     </LinearLayout>
