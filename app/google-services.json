@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "539771298090",
-    "project_id": "vit-student",
-    "storage_bucket": "vit-student.appspot.com"
+    "project_number": "49661594296",
+    "project_id": "vtop-app-3dd04",
+    "storage_bucket": "vtop-app-3dd04.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:539771298090:android:a6eb9db58d10b87547fe53",
+        "mobilesdk_app_id": "1:49661594296:android:c106285cfb0fef9babc24d",
         "android_client_info": {
-          "package_name": "com.aistudio.vtopchennai.kpwnzs"
+          "package_name": "com.sai.vit.app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "539771298090-jck5f90j4h8lqd0rfhfbitu4oec0rtqo.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCqiSXHMOq1ty-4adzcFDchAI6ziiQYRnY"
+          "current_key": "AIzaSyCGrTTk2hTT1Kz604tuDB-Pszd6OYbIzg8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "539771298090-jck5f90j4h8lqd0rfhfbitu4oec0rtqo.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

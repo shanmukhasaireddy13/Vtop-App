@@ -12,3 +12,5 @@
 *.aab
 alarms.txt
 package_info.txt
+google-services.json
+old things/
