@@ -3,7 +3,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Dinner: Evening Dining Cloche / Covered Food Platter -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M12.3,2a10,10 0 0,0 -1.9,0.18 10,10 0 1,1 11.42,11.42A10,10 0 0,0 12.3,2z" />
+        android:pathData="M2,17h20v2H2V17z M13.84,7.79C13.94,7.45 14,7.09 14,6.72c0,-1.5 -1.22,-2.72 -2.72,-2.72c-1.5,0 -2.72,1.22 -2.72,2.72c0,0.37 0.06,0.73 0.16,1.07C4.87,9.1 2,12.7 2,16h20C22,12.7 17.13,9.1 13.84,7.79z M12,5.5c0.67,0 1.22,0.55 1.22,1.22c0,0.67 -0.55,1.22 -1.22,1.22s-1.22,-0.55 -1.22,-1.22C10.78,6.05 11.33,5.5 12,5.5z" />
 </vector>
