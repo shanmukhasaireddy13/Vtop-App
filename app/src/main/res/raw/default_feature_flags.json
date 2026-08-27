@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "flags": {
+    "enable_meals_laundry": true,
+    "enable_ai_hostel_customizer": true,
+    "enable_in_app_updates": true,
+    "enable_moodle": true,
+    "enable_smart_dnd": true,
+    "enable_cgpa_calculator": true,
+    "maintenance_mode": false,
+    "maintenance_message": "VTOP servers are temporarily undergoing maintenance. Please check back shortly."
+  },
+  "announcement": {
+    "enabled": false,
+    "id": "announcement_001",
+    "title": "Welcome to VTOP Chennai",
+    "message": "",
+    "action_url": ""
+  }
+}

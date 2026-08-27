@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Privacy Policy - VTOP Chennai</title>
+    <style>
+        :root {
+            --bg-color: #fcfdf6;
+            --text-primary: #1a1c18;
+            --text-secondary: #43483f;
+            --surface-variant: #e0e4d7;
+            --primary: #386a20;
+            --card-bg: #ffffff;
+            --border-color: #c4c8ba;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121411;
+                --text-primary: #e2e3dd;
+                --text-secondary: #c4c8ba;
+                --surface-variant: #2d312a;
+                --primary: #9ed67d;
+                --card-bg: #1a1c18;
+                --border-color: #43483f;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px 16px 40px 16px;
+        }
+
+        .header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .last-updated {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 18px 16px;
+            margin-bottom: 16px;
+        }
+
+        h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        ul {
+            padding-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        li {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .highlight {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: var(--surface-variant);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Privacy Policy</h1>
+        <div class="last-updated">VTOP Chennai App &bull; Updated August 2026</div>
+    </div>
+
+    <div class="card">
+        <span class="badge">Privacy First</span>
+        <h2>1. Client-Side Architecture</h2>
+        <p>VTOP Chennai is built with a strict <span class="highlight">client-side first</span> philosophy. The application communicates directly with official VIT servers (VTOP and Moodle) from your device.</p>
+        <p>We do <span class="highlight">not</span> operate intermediate servers that capture, log, or store your student credentials.</p>
+    </div>
+
+    <div class="card">
+        <h2>2. Data Stored on Your Device</h2>
+        <p>All academic and profile information fetched from VTOP is stored locally and securely on your phone:</p>
+        <ul>
+            <li><span class="highlight">Login Session &amp; Cookies:</span> Saved locally to maintain your session without asking for passwords repeatedly.</li>
+            <li><span class="highlight">Academic Records:</span> Attendance, course timetable, grades, exam schedules, and receipts are cached in an encrypted local SQLite database for fast offline viewing.</li>
+            <li><span class="highlight">Hostel Schedules:</span> Mess menus, room numbers, and laundry drop-off dates are stored in local device preferences.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>3. Permissions &amp; How They Are Used</h2>
+        <ul>
+            <li><span class="highlight">Notifications &amp; Alarms:</span> Used solely to notify you before scheduled classes and upcoming examinations.</li>
+            <li><span class="highlight">Do Not Disturb (Smart DND):</span> Used strictly during class hours to silence your phone and restore previous ringer settings when class ends.</li>
+            <li><span class="highlight">Internet Access:</span> Required to sync your latest attendance, marks, and timetable directly from VTOP and Moodle.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>4. Third-Party Services</h2>
+        <p>The app uses minimal standard services:</p>
+        <ul>
+            <li><span class="highlight">Google Firebase Analytics / Crashlytics:</span> Collects anonymous app performance and crash diagnostics to fix bugs. No student registration numbers or passwords are ever transmitted.</li>
+            <li><span class="highlight">GitHub Releases:</span> Used to check for official application updates and download new releases securely.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>5. Your Control &amp; Data Deletion</h2>
+        <p>You have full control over your data. Tapping <span class="highlight">Sign Out</span> from the Profile screen instantly clears all local cookies, cached database entries, and credentials from your device.</p>
+    </div>
+
+</body>
+</html>

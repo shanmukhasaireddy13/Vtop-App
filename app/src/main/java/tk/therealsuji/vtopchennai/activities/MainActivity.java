@@ -48,6 +48,7 @@ import tk.therealsuji.vtopchennai.fragments.MealsLaundryFragment;
 import tk.therealsuji.vtopchennai.fragments.HomeFragment;
 import tk.therealsuji.vtopchennai.fragments.PerformanceFragment;
 import tk.therealsuji.vtopchennai.fragments.ProfileFragment;
+import tk.therealsuji.vtopchennai.helpers.FeatureFlagsRepository;
 import tk.therealsuji.vtopchennai.fragments.dialogs.UpdateDialogFragment;
 import tk.therealsuji.vtopchennai.fragments.dialogs.WhatsNewBottomSheetFragment;
 import tk.therealsuji.vtopchennai.helpers.AppDatabase;
@@ -243,6 +244,12 @@ public class MainActivity extends AppCompatActivity {
         FirebaseAnalytics.getInstance(this).logEvent("app_data", bundle);
 
         this.bottomNavigationView = findViewById(R.id.bottom_navigation);
+
+        FeatureFlagsRepository.fetchRemoteFlags(this);
+        if (bottomNavigationView != null && bottomNavigationView.getMenu() != null) {
+            bottomNavigationView.getMenu().findItem(R.id.item_meals_laundry)
+                    .setVisible(FeatureFlagsRepository.isMealsLaundryEnabled(this));
+        }
 
         Bundle customInsets = new Bundle();
         customInsets.putInt("systemWindowInsetLeft", 0);

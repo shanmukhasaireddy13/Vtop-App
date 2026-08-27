@@ -82,7 +82,7 @@ import tk.therealsuji.vtopchennai.receivers.SmartDndReceiver;
 
 public class SettingsRepository {
     public static final String GITHUB_OWNER = "shanmukhasaireddy13";
-    public static final String GITHUB_REPO = "Vtop-App";
+    public static final String GITHUB_REPO = "vtop-releases";
     public static final String GITHUB_BASE_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
     public static final String GITHUB_RELEASES_URL = GITHUB_BASE_URL + "/releases";
     public static final String GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/latest";
@@ -91,7 +91,7 @@ public class SettingsRepository {
 
     public static final String APP_BASE_URL = GITHUB_BASE_URL;
     public static final String APP_ABOUT_URL = GITHUB_LATEST_RELEASE_API;
-    public static final String APP_PRIVACY_URL = GITHUB_BASE_URL + "/blob/main/README.md";
+    public static final String APP_PRIVACY_URL = "file:///android_asset/privacy_policy.html";
     public static final String DEVELOPER_BASE_URL = "https://github.com/" + GITHUB_OWNER;
 
     public static final String MOODLE_BASE_URL = "https://lms.vit.ac.in";

@@ -41,6 +41,8 @@ import java.util.Locale;
 
 import tk.therealsuji.vtopchennai.R;
 import tk.therealsuji.vtopchennai.adapters.MealsLaundryPagerAdapter;
+import tk.therealsuji.vtopchennai.helpers.FeatureFlagsRepository;
+import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 
 public class MealsLaundryFragment extends Fragment {
 
@@ -152,6 +154,7 @@ public class MealsLaundryFragment extends Fragment {
 
         View buttonCustomize = root.findViewById(R.id.button_customize_hostel_data);
         if (buttonCustomize != null) {
+            buttonCustomize.setVisibility(FeatureFlagsRepository.isAiCustomizerEnabled(getContext()) ? View.VISIBLE : View.GONE);
             buttonCustomize.setOnClickListener(v -> {
                 HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
                     loadHostelData();
