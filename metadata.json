@@ -1,0 +1,6 @@
+{
+  "name": "VIT Student",
+  "description": "VTOP App for VIT Chennai Students to view timetables, assignments, grades, profile and more.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
