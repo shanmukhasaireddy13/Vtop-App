@@ -286,9 +286,15 @@ public class ViewPagerFragment extends Fragment {
                     tempMonth = Integer.parseInt(parts[1]);
                 } catch (Exception ignored) {}
             }
+        } else {
+            // Default to today's date if no target_date is provided (e.g. opened from Settings)
+            java.util.Calendar today = java.util.Calendar.getInstance();
+            tempYear = today.get(java.util.Calendar.YEAR);
+            tempMonth = today.get(java.util.Calendar.MONTH) + 1;
         }
         final int targetYear = tempYear;
         final int targetMonth = tempMonth;
+        final String effectiveTargetDate = targetDate;
 
         calendarDao
                 .getUniqueMonths()
@@ -307,20 +313,36 @@ public class ViewPagerFragment extends Fragment {
                             return;
                         }
 
-                        viewPager.setAdapter(new CalendarPagerAdapter(uniqueMonths, targetDate));
+                        viewPager.setAdapter(new CalendarPagerAdapter(uniqueMonths, effectiveTargetDate));
 
                         int targetIndex = 0;
                         if (targetYear != -1 && targetMonth != -1) {
+                            boolean matched = false;
                             for (int i = 0; i < uniqueMonths.size(); i++) {
                                 CalendarDao.MonthYear my = uniqueMonths.get(i);
                                 if (my.month == targetMonth && my.year == targetYear) {
                                     targetIndex = i;
+                                    matched = true;
                                     break;
                                 }
                             }
+                            if (!matched) {
+                                // If current month is outside the range, select closest month
+                                int currentScore = targetYear * 12 + targetMonth;
+                                int minDiff = Integer.MAX_VALUE;
+                                for (int i = 0; i < uniqueMonths.size(); i++) {
+                                    CalendarDao.MonthYear my = uniqueMonths.get(i);
+                                    int mScore = my.year * 12 + my.month;
+                                    int diff = Math.abs(currentScore - mScore);
+                                    if (diff < minDiff) {
+                                        minDiff = diff;
+                                        targetIndex = i;
+                                    }
+                                }
+                            }
                         }
-                        viewPager.setCurrentItem(targetIndex, false);
 
+                        final int finalTargetIndex = targetIndex;
                         tabLayoutMediator = new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
                             CalendarDao.MonthYear my = uniqueMonths.get(position);
                             String name = (my.month >= 1 && my.month <= 12) ? MONTH_NAMES[my.month - 1] : "";
@@ -328,6 +350,15 @@ public class ViewPagerFragment extends Fragment {
                             TooltipCompat.setTooltipText(tab.view, null);
                         });
                         tabLayoutMediator.attach();
+
+                        viewPager.setCurrentItem(finalTargetIndex, false);
+                        viewPager.post(() -> {
+                            viewPager.setCurrentItem(finalTargetIndex, false);
+                            TabLayout.Tab tab = tabLayout.getTabAt(finalTargetIndex);
+                            if (tab != null) {
+                                tab.select();
+                            }
+                        });
 
                         // This is required to set the tooltip text again since it gets reset to the tab's text
                         for (int i = 0; i < tabLayout.getTabCount(); ++i) {
