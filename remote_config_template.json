@@ -1,0 +1,60 @@
+{
+  "parameters": {
+    "enable_meals_laundry": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Show/hide Meals and Laundry tab",
+      "valueType": "BOOLEAN"
+    },
+    "enable_ai_hostel_customizer": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Show/hide hanging signboard AI customizer button",
+      "valueType": "BOOLEAN"
+    },
+    "enable_in_app_updates": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enable in-app direct APK updater",
+      "valueType": "BOOLEAN"
+    },
+    "enable_moodle": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enable Moodle assignment tracking",
+      "valueType": "BOOLEAN"
+    },
+    "enable_smart_dnd": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enable Smart DND auto-muting",
+      "valueType": "BOOLEAN"
+    },
+    "enable_cgpa_calculator": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Enable CGPA calculator",
+      "valueType": "BOOLEAN"
+    },
+    "maintenance_mode": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Maintenance mode switch",
+      "valueType": "BOOLEAN"
+    },
+    "maintenance_message": {
+      "defaultValue": {
+        "value": "VTOP servers are temporarily undergoing maintenance. Please check back shortly."
+      },
+      "description": "Maintenance banner message",
+      "valueType": "STRING"
+    }
+  }
+}
