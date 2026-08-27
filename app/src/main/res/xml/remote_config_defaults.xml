@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<defaultsMap>
+    <entry>
+        <key>enable_meals_laundry</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>enable_ai_hostel_customizer</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>enable_in_app_updates</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>enable_moodle</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>enable_smart_dnd</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>enable_cgpa_calculator</key>
+        <value>true</value>
+    </entry>
+    <entry>
+        <key>maintenance_mode</key>
+        <value>false</value>
+    </entry>
+    <entry>
+        <key>maintenance_message</key>
+        <value>VTOP servers are temporarily undergoing maintenance. Please check back shortly.</value>
+    </entry>
+</defaultsMap>

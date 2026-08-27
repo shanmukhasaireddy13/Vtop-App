@@ -245,7 +245,7 @@ public class MainActivity extends AppCompatActivity {
 
         this.bottomNavigationView = findViewById(R.id.bottom_navigation);
 
-        FeatureFlagsRepository.fetchRemoteFlags(this);
+        FeatureFlagsRepository.initAndFetch(this);
         if (bottomNavigationView != null && bottomNavigationView.getMenu() != null) {
             bottomNavigationView.getMenu().findItem(R.id.item_meals_laundry)
                     .setVisible(FeatureFlagsRepository.isMealsLaundryEnabled(this));
