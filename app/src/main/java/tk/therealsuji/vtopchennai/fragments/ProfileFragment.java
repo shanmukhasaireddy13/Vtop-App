@@ -328,7 +328,7 @@ public class ProfileFragment extends Fragment {
                         Intent intent = new Intent();
                         intent.setAction(Intent.ACTION_SEND);
                         intent.putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject));
-                        intent.putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_text, SettingsRepository.APP_BASE_URL));
+                        intent.putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_text, SettingsRepository.GITHUB_RELEASES_URL));
                         intent.setType("text/plain");
 
                         Intent shareIntent = Intent.createChooser(intent, context.getString(R.string.share_title));

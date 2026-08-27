@@ -137,9 +137,9 @@
     <string name="sign_out_app">Sign out of &app_name;</string>
 
     <!-- Share Intent Strings -->
-    <string name="share_subject">Get the &app_name; android app</string>
-    <string name="share_text">Visit %s to download the latest version of &app_name;.</string>
-    <string name="share_title">Share \"&app_name;\" via</string>
+    <string name="share_subject">Download VTOP Chennai Android App</string>
+    <string name="share_text">Download the latest VTOP Chennai Android app for attendance, grades, timetable, Smart DND, mess menu &amp; laundry schedule: %s</string>
+    <string name="share_title">Share VTOP Chennai via</string>
 
     <!-- Empty State String -->
     <string name="fetch_assignments">Fetching your assignments</string>
