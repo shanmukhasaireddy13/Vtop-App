@@ -70,6 +70,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import tk.therealsuji.vtopchennai.BuildConfig;
 import tk.therealsuji.vtopchennai.R;
+import tk.therealsuji.vtopchennai.VTOP;
 import tk.therealsuji.vtopchennai.activities.WebViewActivity;
 import tk.therealsuji.vtopchennai.fragments.RecyclerViewFragment;
 import tk.therealsuji.vtopchennai.fragments.ViewPagerFragment;
@@ -282,6 +283,10 @@ public class SettingsRepository {
                             int computedVersionCode = parseVersionToCode(tagName);
                             result.put("versionCode", computedVersionCode);
 
+                            if (VTOP.getContext() != null) {
+                                saveLatestReleaseNotes(VTOP.getContext(), tagName, releaseNotes);
+                            }
+
                             return result;
                         }
                     } catch (Exception ignored) {
@@ -294,6 +299,90 @@ public class SettingsRepository {
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    public static final String KEY_LATEST_RELEASE_NOTES = "latest_release_notes";
+    public static final String KEY_LATEST_RELEASE_TAG = "latest_release_tag";
+    public static final String KEY_CUSTOM_HOSTEL_DATA = "custom_hostel_data_json";
+
+    public static String getLatestReleaseNotes(Context context) {
+        if (context == null) return null;
+        SharedPreferences prefs = getSharedPreferences(context);
+        return prefs.getString(KEY_LATEST_RELEASE_NOTES, null);
+    }
+
+    public static void saveLatestReleaseNotes(Context context, String tag, String notes) {
+        if (context == null) return;
+        SharedPreferences prefs = getSharedPreferences(context);
+        prefs.edit()
+                .putString(KEY_LATEST_RELEASE_TAG, tag)
+                .putString(KEY_LATEST_RELEASE_NOTES, notes)
+                .apply();
+    }
+
+    public static String getCustomHostelData(Context context) {
+        if (context == null) return null;
+        SharedPreferences prefs = getSharedPreferences(context);
+        return prefs.getString(KEY_CUSTOM_HOSTEL_DATA, null);
+    }
+
+    public static void saveCustomHostelData(Context context, String json) {
+        if (context == null) return;
+        SharedPreferences prefs = getSharedPreferences(context);
+        prefs.edit().putString(KEY_CUSTOM_HOSTEL_DATA, json).apply();
+    }
+
+    public static void resetCustomHostelData(Context context) {
+        if (context == null) return;
+        SharedPreferences prefs = getSharedPreferences(context);
+        prefs.edit().remove(KEY_CUSTOM_HOSTEL_DATA).apply();
+    }
+
+    public static String getAiPromptTemplate() {
+        return "Please extract the hostel mess menu and/or laundry schedule from the attached image(s) and return ONLY a valid JSON object strictly matching this schema without any markdown formatting or commentary:\n\n" +
+                "{\n" +
+                "  \"laundry\": {\n" +
+                "    \"1\": \"101 - 322\",\n" +
+                "    \"2\": \"\",\n" +
+                "    \"3\": \"323 - 514\",\n" +
+                "    \"4\": \"515 - 715\",\n" +
+                "    \"5\": \"716 - 918\",\n" +
+                "    \"6\": \"919 - 1127\",\n" +
+                "    \"7\": \"1128 - 1523\",\n" +
+                "    \"8\": \"101 - 322\"\n" +
+                "  },\n" +
+                "  \"meals\": {\n" +
+                "    \"menu_1\": {\n" +
+                "      \"monday\": {\n" +
+                "        \"breakfast\": \"Idli, Sambar, Chutney, Bread Butter Jam, Tea/Coffee\",\n" +
+                "        \"lunch\": \"Rice, Dal Tadka, Paneer Butter Masala / Chicken Curry, Roti, Curd, Salad\",\n" +
+                "        \"snacks\": \"Samosa, Mint Chutney, Tea/Coffee\",\n" +
+                "        \"dinner\": \"Fried Rice, Manchurian, Dal Makhani, Roti, Ice Cream\"\n" +
+                "      },\n" +
+                "      \"tuesday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"wednesday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"thursday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"friday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"saturday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"sunday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" }\n" +
+                "    },\n" +
+                "    \"menu_2\": {\n" +
+                "      \"monday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"tuesday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"wednesday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"thursday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"friday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"saturday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" },\n" +
+                "      \"sunday\": { \"breakfast\": \"...\", \"lunch\": \"...\", \"snacks\": \"...\", \"dinner\": \"...\" }\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n\n" +
+                "Formatting Guidelines:\n" +
+                "- menu_1 is Cycle 1 (Week 1 & 3), menu_2 is Cycle 2 (Week 2 & 4). If the hostel only has 1 weekly menu, duplicate the 7 days into both menu_1 and menu_2.\n" +
+                "- All day names must be lowercase: monday, tuesday, wednesday, thursday, friday, saturday, sunday.\n" +
+                "- All meal categories must be lowercase: breakfast, lunch, snacks, dinner.\n" +
+                "- For laundry: keys are day-of-month strings (\"1\" through \"31\"), values are room number ranges (e.g. \"101 - 322\") or empty string \"\" for no drop-off days.\n" +
+                "- Return valid raw JSON ONLY.";
     }
 
     public static boolean isVersionNewer(String remoteTag, String localVersionName) {

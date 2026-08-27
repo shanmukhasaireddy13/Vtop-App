@@ -20,6 +20,9 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
+import tk.therealsuji.vtopchennai.fragments.dialogs.HostelDataCustomizerBottomSheet;
+import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
+
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
@@ -147,6 +150,17 @@ public class MealsLaundryFragment extends Fragment {
             }
         });
 
+        View buttonCustomize = root.findViewById(R.id.button_customize_hostel_data);
+        if (buttonCustomize != null) {
+            buttonCustomize.setOnClickListener(v -> {
+                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
+                    loadHostelData();
+                    updateDayAndMenu();
+                    updateLaundryUI();
+                });
+            });
+        }
+
         loadHostelData();
         setupViewPager(root);
 
@@ -154,6 +168,18 @@ public class MealsLaundryFragment extends Fragment {
     }
 
     private void loadHostelData() {
+        try {
+            Context context = getContext();
+            if (context != null) {
+                String customJson = SettingsRepository.getCustomHostelData(context);
+                if (customJson != null && !customJson.trim().isEmpty()) {
+                    hostelData = new JSONObject(customJson);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
         try {
             InputStream is = getResources().openRawResource(R.raw.hostel_data);
             int size = is.available();
@@ -258,6 +284,17 @@ public class MealsLaundryFragment extends Fragment {
             @Override
             public void onTabReselected(TabLayout.Tab tab) {}
         });
+
+        View buttonAiImportMeals = view.findViewById(R.id.button_ai_import_meals);
+        if (buttonAiImportMeals != null) {
+            buttonAiImportMeals.setOnClickListener(v -> {
+                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
+                    loadHostelData();
+                    updateDayAndMenu();
+                    updateLaundryUI();
+                });
+            });
+        }
 
         updateDayAndMenu();
     }
@@ -537,7 +574,24 @@ public class MealsLaundryFragment extends Fragment {
             editTextRoomNumber.requestFocus();
         });
 
+        View buttonAiImportLaundry = view.findViewById(R.id.button_ai_import_laundry);
+        if (buttonAiImportLaundry != null) {
+            buttonAiImportLaundry.setOnClickListener(v -> {
+                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
+                    loadHostelData();
+                    updateDayAndMenu();
+                    updateLaundryUI();
+                });
+            });
+        }
+
         updateLaundryUI(savedRoom);
+    }
+
+    private void updateLaundryUI() {
+        if (getContext() == null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences("Settings", Context.MODE_PRIVATE);
+        updateLaundryUI(prefs.getString("roomNumber", ""));
     }
 
     private void updateLaundryUI(String roomStr) {
