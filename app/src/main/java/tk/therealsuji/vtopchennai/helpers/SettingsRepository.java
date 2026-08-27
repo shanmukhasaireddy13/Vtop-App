@@ -277,6 +277,30 @@ public class SettingsRepository {
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
+    public static boolean isVersionNewer(String remoteTag, String localVersionName) {
+        if (remoteTag == null || localVersionName == null) return false;
+        try {
+            String cleanRemote = remoteTag.replaceAll("[^0-9.]", "").trim();
+            String cleanLocal = localVersionName.replaceAll("[^0-9.]", "").trim();
+
+            if (cleanRemote.isEmpty() || cleanLocal.isEmpty()) return false;
+
+            String[] remoteParts = cleanRemote.split("\\.");
+            String[] localParts = cleanLocal.split("\\.");
+
+            int length = Math.max(remoteParts.length, localParts.length);
+            for (int i = 0; i < length; i++) {
+                int remoteVal = (i < remoteParts.length && !remoteParts[i].isEmpty()) ? Integer.parseInt(remoteParts[i]) : 0;
+                int localVal = (i < localParts.length && !localParts[i].isEmpty()) ? Integer.parseInt(localParts[i]) : 0;
+
+                if (remoteVal > localVal) return true;
+                if (remoteVal < localVal) return false;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public static int parseVersionToCode(String version) {
         if (version == null) return 0;
         String clean = version.replaceAll("[^0-9.]", "").trim();

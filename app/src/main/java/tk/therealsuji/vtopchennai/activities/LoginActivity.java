@@ -145,7 +145,7 @@ public class LoginActivity extends AppCompatActivity {
                             String versionName = about.optString("tagName", "");
                             String releaseNotes = about.optString("releaseNotes", "");
 
-                            if (versionCode > BuildConfig.VERSION_CODE) {
+                            if (SettingsRepository.isVersionNewer(versionName, BuildConfig.VERSION_NAME)) {
                                 FragmentManager fragmentManager = getSupportFragmentManager();
                                 FragmentTransaction transaction = fragmentManager.beginTransaction();
                                 transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);

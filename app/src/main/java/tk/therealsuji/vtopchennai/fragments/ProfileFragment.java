@@ -270,7 +270,7 @@ public class ProfileFragment extends Fragment {
                                             String versionName = about.optString("tagName", "");
                                             String releaseNotes = about.optString("releaseNotes", "");
 
-                                            if (versionCode > BuildConfig.VERSION_CODE) {
+                                            if (SettingsRepository.isVersionNewer(versionName, BuildConfig.VERSION_NAME)) {
                                                 FragmentManager fragmentManager = getParentFragmentManager();
                                                 FragmentTransaction transaction = fragmentManager.beginTransaction();
                                                 transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
