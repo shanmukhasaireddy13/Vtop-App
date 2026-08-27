@@ -255,10 +255,29 @@ public class SettingsRepository {
                             String releaseNotes = release.optString("body", "Bug fixes and performance improvements.");
                             String htmlUrl = release.optString("html_url", GITHUB_RELEASES_URL);
 
+                            // Find direct APK asset url
+                            String directApkUrl = null;
+                            JSONArray assets = release.optJSONArray("assets");
+                            if (assets != null && assets.length() > 0) {
+                                for (int i = 0; i < assets.length(); i++) {
+                                    JSONObject asset = assets.optJSONObject(i);
+                                    if (asset != null) {
+                                        String name = asset.optString("name", "");
+                                        if (name.endsWith(".apk")) {
+                                            directApkUrl = asset.optString("browser_download_url", "");
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (directApkUrl == null || directApkUrl.isEmpty()) {
+                                directApkUrl = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/releases/download/" + tagName + "/app-debug.apk";
+                            }
+
                             JSONObject result = new JSONObject();
                             result.put("tagName", tagName);
                             result.put("releaseNotes", releaseNotes);
-                            result.put("downloadUrl", htmlUrl);
+                            result.put("downloadUrl", directApkUrl);
 
                             int computedVersionCode = parseVersionToCode(tagName);
                             result.put("versionCode", computedVersionCode);
@@ -313,6 +332,33 @@ public class SettingsRepository {
         } catch (NumberFormatException ignored) {
         }
         return code;
+    }
+
+    public static void downloadAndInstallUpdate(Context context, String versionName, String apkUrl) {
+        if (apkUrl == null || apkUrl.isEmpty()) {
+            apkUrl = GITHUB_RELEASES_URL;
+        }
+
+        String fileName = "VTOP-" + (versionName != null && versionName.startsWith("v") ? versionName : "v" + versionName) + ".apk";
+        Toast.makeText(context, "Starting download: " + fileName + "\nCheck notification bar for download progress.", Toast.LENGTH_LONG).show();
+
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl));
+            request.setTitle("Downloading " + fileName);
+            request.setDescription("VTOP App Update " + versionName);
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            request.setMimeType("application/vnd.android.package-archive");
+            request.allowScanningByMediaScanner();
+
+            DownloadManager downloadManager = (DownloadManager) context.getSystemService(DOWNLOAD_SERVICE);
+            if (downloadManager != null) {
+                downloadManager.enqueue(request);
+            }
+        } catch (Exception e) {
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl));
+            context.startActivity(browserIntent);
+        }
     }
 
     public static void openDownloadPage(Context context) {

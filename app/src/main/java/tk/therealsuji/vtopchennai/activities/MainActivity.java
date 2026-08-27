@@ -403,12 +403,13 @@ public class MainActivity extends AppCompatActivity {
                             int versionCode = about.optInt("versionCode", 0);
                             String versionName = about.optString("tagName", "");
                             String releaseNotes = about.optString("releaseNotes", "");
+                            String downloadUrl = about.optString("downloadUrl", "");
 
                             if (SettingsRepository.isVersionNewer(versionName, BuildConfig.VERSION_NAME)) {
                                 FragmentManager fragmentManager = getSupportFragmentManager();
                                 FragmentTransaction transaction = fragmentManager.beginTransaction();
                                 transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
-                                transaction.add(android.R.id.content, UpdateDialogFragment.newInstance(versionName, releaseNotes)).addToBackStack(null).commit();
+                                transaction.add(android.R.id.content, UpdateDialogFragment.newInstance(versionName, releaseNotes, downloadUrl)).addToBackStack(null).commit();
 
                                 return;
                             }

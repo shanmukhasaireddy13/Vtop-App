@@ -269,12 +269,13 @@ public class ProfileFragment extends Fragment {
                                             int versionCode = about.optInt("versionCode", 0);
                                             String versionName = about.optString("tagName", "");
                                             String releaseNotes = about.optString("releaseNotes", "");
+                                            String downloadUrl = about.optString("downloadUrl", "");
 
                                             if (SettingsRepository.isVersionNewer(versionName, BuildConfig.VERSION_NAME)) {
                                                 FragmentManager fragmentManager = getParentFragmentManager();
                                                 FragmentTransaction transaction = fragmentManager.beginTransaction();
                                                 transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
-                                                transaction.add(android.R.id.content, UpdateDialogFragment.newInstance(versionName, releaseNotes)).addToBackStack(null).commit();
+                                                transaction.add(android.R.id.content, UpdateDialogFragment.newInstance(versionName, releaseNotes, downloadUrl)).addToBackStack(null).commit();
                                             } else {
                                                 Toast.makeText(context, "You're on the latest version (v" + BuildConfig.VERSION_NAME + ")!", Toast.LENGTH_SHORT).show();
                                             }

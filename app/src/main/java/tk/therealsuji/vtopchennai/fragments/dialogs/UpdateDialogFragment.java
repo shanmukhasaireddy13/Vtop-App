@@ -18,18 +18,23 @@ import tk.therealsuji.vtopchennai.R;
 import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 
 public class UpdateDialogFragment extends DialogFragment {
-    String versionName, releaseNotes;
+    String versionName, releaseNotes, downloadUrl;
 
     public UpdateDialogFragment() {
         // Required empty public constructor
     }
 
     public static UpdateDialogFragment newInstance(String versionName, String releaseNotes) {
+        return newInstance(versionName, releaseNotes, null);
+    }
+
+    public static UpdateDialogFragment newInstance(String versionName, String releaseNotes, String downloadUrl) {
         Bundle args = new Bundle();
         UpdateDialogFragment fragment = new UpdateDialogFragment();
 
         args.putString("versionName", versionName);
         args.putString("releaseNotes", releaseNotes);
+        args.putString("downloadUrl", downloadUrl);
 
         fragment.setArguments(args);
         return fragment;
@@ -44,6 +49,7 @@ public class UpdateDialogFragment extends DialogFragment {
         if (args != null) {
             this.versionName = args.getString("versionName");
             this.releaseNotes = args.getString("releaseNotes");
+            this.downloadUrl = args.getString("downloadUrl");
         }
 
         TextView description = dialogFragment.findViewById(R.id.text_view_description);
@@ -54,7 +60,10 @@ public class UpdateDialogFragment extends DialogFragment {
         markwon.setMarkdown(releaseNotes, this.releaseNotes);
 
         dialogFragment.findViewById(R.id.button_cancel).setOnClickListener(view -> this.dismiss());
-        dialogFragment.findViewById(R.id.button_update).setOnClickListener(view -> SettingsRepository.openDownloadPage(this.requireContext()));
+        dialogFragment.findViewById(R.id.button_update).setOnClickListener(view -> {
+            SettingsRepository.downloadAndInstallUpdate(this.requireContext(), this.versionName, this.downloadUrl);
+            this.dismiss();
+        });
 
         return dialogFragment;
     }
