@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.RoomWarnings;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -23,6 +24,22 @@ public interface CoursesDao {
 
     @Query("DELETE FROM courses")
     Completable deleteAll();
+
+    @Query("DELETE FROM courses")
+    void deleteAllSync();
+
+    @Insert
+    void insertCoursesSync(List<Course> courses);
+
+    @Insert
+    void insertSlotsSync(List<Slot> slots);
+
+    @Transaction
+    default void replaceAll(List<Course> courses, List<Slot> slots) {
+        deleteAllSync();
+        insertCoursesSync(courses);
+        insertSlotsSync(slots);
+    }
 
     @Query("SELECT DISTINCT code FROM courses, slots WHERE slots.course_id = courses.id ORDER BY slot")
     Single<List<String>> getCourseCodes();

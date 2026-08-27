@@ -3,6 +3,7 @@ package tk.therealsuji.vtopchennai.interfaces;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -18,6 +19,18 @@ public interface CalendarDao {
 
     @Query("DELETE FROM calendar_events")
     Completable deleteAll();
+
+    @Query("DELETE FROM calendar_events")
+    void deleteAllSync();
+
+    @Insert
+    void insertSync(List<CalendarEvent> events);
+
+    @Transaction
+    default void replaceAll(List<CalendarEvent> events) {
+        deleteAllSync();
+        insertSync(events);
+    }
 
     /** Returns all calendar events ordered chronologically. */
     @Query("SELECT * FROM calendar_events ORDER BY year, month, day")

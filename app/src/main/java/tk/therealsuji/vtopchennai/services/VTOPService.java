@@ -46,6 +46,7 @@ import java.util.regex.Pattern;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
+import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.CompletableObserver;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Observer;
@@ -103,6 +104,29 @@ public class VTOPService extends Service {
     Map<String, String> semesters;
     String username, password, semesterID;
     CompositeDisposable compositeDisposable;
+
+    private static final int TOTAL_PARALLEL_STREAMS = 8;
+    private final java.util.concurrent.atomic.AtomicInteger completedStreams = new java.util.concurrent.atomic.AtomicInteger(0);
+
+    private void onStreamComplete(String streamName) {
+        int finished = completedStreams.incrementAndGet();
+        updateProgress(null);
+        if (finished >= TOTAL_PARALLEL_STREAMS) {
+            finishUp();
+        }
+    }
+
+    private void startParallelDownloads() {
+        this.completedStreams.set(0);
+        this.downloadTimetable();
+        this.downloadAttendance();
+        this.downloadMarks();
+        this.downloadExamSchedule();
+        this.downloadProctor();
+        this.downloadSpotlight();
+        this.downloadReceipts();
+        this.downloadCalendar();
+    }
 
     public void clearCallback() {
         this.callback = null;
@@ -166,7 +190,16 @@ public class VTOPService extends Service {
             } else {
                 this.username = encryptedSharedPreferences.getString("username", null);
                 this.password = encryptedSharedPreferences.getString("password", null);
-                this.reloadPage("/login", true);
+
+                long lastRefreshed = this.sharedPreferences.getLong("lastRefreshed", 0);
+                long now = System.currentTimeMillis();
+                boolean canReuseSession = (now - lastRefreshed < 1200000) && CookieManager.getInstance().hasCookies();
+
+                if (canReuseSession) {
+                    this.reloadPage("/content", false);
+                } else {
+                    this.reloadPage("/login", false);
+                }
             }
         }
 
@@ -971,37 +1004,23 @@ public class VTOPService extends Service {
                 }
 
                 CoursesDao coursesDao = this.appDatabase.coursesDao();
-
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(coursesDao.deleteAll());
-                Observable<Object> insertCoursesObservable = Observable.fromCompletable(coursesDao.insertCourses(courses));
-                Observable<Object> insertSlotsObservable = Observable.fromCompletable(coursesDao.insertSlots(slots));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertCoursesObservable,
-                                insertSlotsObservable
-                        )
+                Completable.fromAction(() -> coursesDao.replaceAll(courses, slots))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                startParallelDownloads();
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(402, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                downloadTimetable();
                             }
                         });
             } catch (Exception e) {
@@ -1207,40 +1226,30 @@ public class VTOPService extends Service {
                 }
 
                 TimetableDao timetableDao = appDatabase.timetableDao();
-
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(timetableDao.deleteAll());
-                Observable<Object> insertTimetableObservable = Observable.fromCompletable(timetableDao.insert(timetable));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertTimetableObservable
-                        )
+                Completable.fromAction(() -> timetableDao.replaceAll(timetable))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                SettingsRepository.rescheduleDndAlarms(getApplicationContext());
+                                onStreamComplete("Timetable");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(502, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                SettingsRepository.rescheduleDndAlarms(getApplicationContext());
-                                downloadAttendance();
+                                onStreamComplete("Timetable");
                             }
                         });
             } catch (Exception e) {
                 error(501, e.getLocalizedMessage());
+                onStreamComplete("Timetable");
             }
         });
     }
@@ -1460,36 +1469,29 @@ public class VTOPService extends Service {
                 sharedPreferences.edit().putInt("overallAttendance", overallAttendance).apply();
 
                 AttendanceDao attendanceDao = appDatabase.attendanceDao();
-                Observable<Object> deleteObservable = Observable.fromCompletable(attendanceDao.delete());
-                Observable<Object> insertObservable = Observable.fromCompletable(attendanceDao.insert(attendance));
-
-                Observable
-                        .concat(deleteObservable, insertObservable)
+                Completable.fromAction(() -> attendanceDao.replaceAll(attendance))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
-
+                            public void onComplete() {
+                                onStreamComplete("Attendance");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(602, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                downloadMarks();
+                                onStreamComplete("Attendance");
                             }
                         });
             } catch (Exception e) {
                 error(601, e.getLocalizedMessage());
+                onStreamComplete("Attendance");
             }
         });
     }
@@ -1797,38 +1799,30 @@ public class VTOPService extends Service {
                 List<CumulativeMark> cumulativeMarks = new ArrayList<>(this.cumulativeMarks.values());
                 MarksDao marksDao = this.appDatabase.marksDao();
 
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(marksDao.deleteCumulativeMarks());
-                Observable<Object> insertCumulativeMarks = Observable.fromCompletable(marksDao.insertCumulativeMarks(cumulativeMarks));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertCumulativeMarks
-                        )
+                marksDao.deleteCumulativeMarks()
+                        .andThen(marksDao.insertCumulativeMarks(cumulativeMarks))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                onStreamComplete("MarksAndGrades");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(802, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                downloadExamSchedule();
+                                onStreamComplete("MarksAndGrades");
                             }
                         });
             } catch (Exception e) {
                 error(801, e.getLocalizedMessage());
+                onStreamComplete("MarksAndGrades");
             }
         });
     }
@@ -1981,39 +1975,29 @@ public class VTOPService extends Service {
                 SettingsRepository.setExamNotifications(this.getApplicationContext(), exams);
 
                 ExamsDao examsDao = appDatabase.examsDao();
-
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(examsDao.deleteAll());
-                Observable<Object> insertExamsObservable = Observable.fromCompletable(examsDao.insert(exams));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertExamsObservable
-                        )
+                Completable.fromAction(() -> examsDao.replaceAll(exams))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                onStreamComplete("ExamSchedule");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(902, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                downloadProctor();
+                                onStreamComplete("ExamSchedule");
                             }
                         });
             } catch (Exception e) {
                 error(901, e.getLocalizedMessage());
+                onStreamComplete("ExamSchedule");
             }
         });
     }
@@ -2080,39 +2064,29 @@ public class VTOPService extends Service {
                 }
 
                 StaffDao staffDao = appDatabase.staffDao();
-
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(staffDao.deleteAll());
-                Observable<Object> insertStaffObservable = Observable.fromCompletable(staffDao.insert(staff));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertStaffObservable
-                        )
+                Completable.fromAction(() -> staffDao.replaceAll(staff))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                downloadDeanHOD(staff.size());
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(1002, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
                                 downloadDeanHOD(staff.size());
                             }
                         });
             } catch (Exception e) {
                 error(1001, e.getLocalizedMessage());
+                downloadDeanHOD(0);
             }
         });
     }
@@ -2216,16 +2190,18 @@ public class VTOPService extends Service {
 
                             @Override
                             public void onComplete() {
-                                downloadSpotlight();
+                                onStreamComplete("Staff");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(1004, e.getLocalizedMessage());
+                                onStreamComplete("Staff");
                             }
                         });
             } catch (Exception e) {
                 error(1003, e.getLocalizedMessage());
+                onStreamComplete("Staff");
             }
         });
     }
@@ -2326,16 +2302,18 @@ public class VTOPService extends Service {
 
                             @Override
                             public void onComplete() {
-                                downloadReceipts();
+                                onStreamComplete("Spotlight");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(1102, e.getLocalizedMessage());
+                                onStreamComplete("Spotlight");
                             }
                         });
             } catch (Exception e) {
                 error(1101, e.getLocalizedMessage());
+                onStreamComplete("Spotlight");
             }
         });
     }
@@ -2424,39 +2402,29 @@ public class VTOPService extends Service {
                 }
 
                 ReceiptsDao receiptsDao = appDatabase.receiptsDao();
-
-                Observable<Object> deleteAllObservable = Observable.fromCompletable(receiptsDao.deleteAll());
-                Observable<Object> insertReceiptsObservable = Observable.fromCompletable(receiptsDao.insert(receipts));
-
-                Observable
-                        .concat(
-                                deleteAllObservable,
-                                insertReceiptsObservable
-                        )
+                Completable.fromAction(() -> receiptsDao.replaceAll(receipts))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                checkDues();
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(1202, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
                                 checkDues();
                             }
                         });
             } catch (Exception e) {
                 error(1201, e.getLocalizedMessage());
+                checkDues();
             }
         });
     }
@@ -2505,7 +2473,7 @@ public class VTOPService extends Service {
                 error(1203, e.getLocalizedMessage());
             }
 
-            downloadCalendar();
+            onStreamComplete("Receipts");
         });
     }
 
@@ -2678,7 +2646,7 @@ public class VTOPService extends Service {
 
                 if (eventsArray == null || eventsArray.length() == 0) {
                     // Calendar page may not be available for this semester; skip gracefully
-                    finishUp();
+                    onStreamComplete("Calendar");
                     return;
                 }
 
@@ -2695,35 +2663,29 @@ public class VTOPService extends Service {
                 }
 
                 CalendarDao calendarDao = appDatabase.calendarDao();
-                Observable<Object> deleteObservable = Observable.fromCompletable(calendarDao.deleteAll());
-                Observable<Object> insertObservable = Observable.fromCompletable(calendarDao.insert(events));
-
-                Observable
-                        .concat(deleteObservable, insertObservable)
+                Completable.fromAction(() -> calendarDao.replaceAll(events))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Observer<Object>() {
+                        .subscribe(new CompletableObserver() {
                             @Override
                             public void onSubscribe(@NonNull Disposable d) {
                                 compositeDisposable.add(d);
                             }
 
                             @Override
-                            public void onNext(@NonNull Object o) {
+                            public void onComplete() {
+                                onStreamComplete("Calendar");
                             }
 
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(1302, e.getLocalizedMessage());
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                finishUp();
+                                onStreamComplete("Calendar");
                             }
                         });
             } catch (Exception e) {
                 error(1301, e.getLocalizedMessage());
+                onStreamComplete("Calendar");
             }
         });
     }

@@ -3,6 +3,7 @@ package tk.therealsuji.vtopchennai.interfaces;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -17,6 +18,18 @@ public interface StaffDao {
 
     @Query("DELETE FROM staff")
     Completable deleteAll();
+
+    @Query("DELETE FROM staff")
+    void deleteAllSync();
+
+    @Insert
+    void insertSync(List<Staff> staff);
+
+    @Transaction
+    default void replaceAll(List<Staff> staff) {
+        deleteAllSync();
+        insertSync(staff);
+    }
 
     @Query("SELECT * FROM staff WHERE type = :staffType AND value IS NOT NULL")
     Single<List<Staff>> getStaff(String staffType);

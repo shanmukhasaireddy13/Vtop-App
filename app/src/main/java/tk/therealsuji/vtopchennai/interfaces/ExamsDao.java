@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.RoomWarnings;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -19,6 +20,18 @@ public interface ExamsDao {
 
     @Query("DELETE FROM exams")
     Completable deleteAll();
+
+    @Query("DELETE FROM exams")
+    void deleteAllSync();
+
+    @Insert
+    void insertSync(List<Exam> exams);
+
+    @Transaction
+    default void replaceAll(List<Exam> exams) {
+        deleteAllSync();
+        insertSync(exams);
+    }
 
     @Query("SELECT * FROM exams")
     Single<List<Exam>> getExams();

@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.RoomWarnings;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -76,6 +77,18 @@ public interface TimetableDao {
 
     @Query("DELETE FROM timetable")
     Completable deleteAll();
+
+    @Query("DELETE FROM timetable")
+    void deleteAllSync();
+
+    @Insert
+    void insertSync(List<Timetable> timetable);
+
+    @Transaction
+    default void replaceAll(List<Timetable> timetable) {
+        deleteAllSync();
+        insertSync(timetable);
+    }
 
     @Query("SELECT * FROM timetable")
     Single<List<Timetable>> getTimetable();

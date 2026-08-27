@@ -3,6 +3,7 @@ package tk.therealsuji.vtopchennai.interfaces;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
+import androidx.room.Transaction;
 
 import java.util.List;
 
@@ -16,4 +17,16 @@ public interface AttendanceDao {
 
     @Query("DELETE FROM attendance")
     Completable delete();
+
+    @Query("DELETE FROM attendance")
+    void deleteSync();
+
+    @Insert
+    void insertSync(List<Attendance> attendance);
+
+    @Transaction
+    default void replaceAll(List<Attendance> attendance) {
+        deleteSync();
+        insertSync(attendance);
+    }
 }
