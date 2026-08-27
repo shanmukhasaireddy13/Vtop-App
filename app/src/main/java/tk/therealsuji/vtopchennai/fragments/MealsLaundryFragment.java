@@ -201,12 +201,10 @@ public class MealsLaundryFragment extends Fragment {
 
         tabLayoutMediator = new TabLayoutMediator(tabLayoutMain, viewPager, (tab, position) -> {
             if (position == 0) {
-                tab.setText(R.string.tab_meals);
                 tab.setIcon(R.drawable.ic_restaurant);
                 tab.setContentDescription(getString(R.string.tab_meals));
                 TooltipCompat.setTooltipText(tab.view, getString(R.string.tab_meals));
             } else {
-                tab.setText(R.string.tab_laundry);
                 tab.setIcon(R.drawable.ic_laundry);
                 tab.setContentDescription(getString(R.string.tab_laundry));
                 TooltipCompat.setTooltipText(tab.view, getString(R.string.tab_laundry));
@@ -439,103 +437,111 @@ public class MealsLaundryFragment extends Fragment {
             }
         }
 
+        if (layoutMealDishesContainer == null) return;
+        layoutMealDishesContainer.removeAllViews();
+        float density = getResources().getDisplayMetrics().density;
+
+        String mealRaw = "";
         try {
-            String dayKey = DAY_KEYS[dayOfWeek];
-
-            JSONObject mealsObj = hostelData.getJSONObject("meals");
-            JSONObject menuObj = mealsObj.getJSONObject(currentMenuKey);
-            JSONObject dayObj = menuObj.getJSONObject(dayKey);
-
-            String mealRaw = dayObj.optString(mealField, "Not available");
-
-            if (layoutMealDishesContainer != null) {
-                layoutMealDishesContainer.removeAllViews();
-
-                if (mealRaw.isEmpty() || mealRaw.equalsIgnoreCase("Not available")) {
-                    TextView emptyView = new TextView(getContext());
-                    emptyView.setText("No menu items scheduled for this meal.");
-                    emptyView.setTextSize(14);
-                    layoutMealDishesContainer.addView(emptyView);
-                } else {
-                    String[] items = mealRaw.split(",\\s*");
-                    float density = getResources().getDisplayMetrics().density;
-
-                    for (int i = 0; i < items.length; i++) {
-                        String dishName = items[i].trim();
-                        if (dishName.isEmpty()) continue;
-
-                        LinearLayout row = new LinearLayout(getContext());
-                        row.setOrientation(LinearLayout.HORIZONTAL);
-                        row.setGravity(Gravity.CENTER_VERTICAL);
-                        row.setPadding(0, (int) (6 * density), 0, (int) (6 * density));
-
-                        // Dish bullet icon
-                        ImageView bulletIcon = new ImageView(getContext());
-                        LinearLayout.LayoutParams bulletParams = new LinearLayout.LayoutParams(
-                                (int) (18 * density), (int) (18 * density)
-                        );
-                        bulletParams.setMarginEnd((int) (10 * density));
-                        bulletIcon.setLayoutParams(bulletParams);
-                        bulletIcon.setImageResource(R.drawable.ic_restaurant);
-                        bulletIcon.setImageTintList(ContextCompat.getColorStateList(requireContext(), R.color.secondary_75));
-
-                        // Dish Name
-                        TextView dishText = new TextView(getContext());
-                        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
-                                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
-                        );
-                        dishText.setLayoutParams(textParams);
-                        dishText.setText(dishName);
-                        dishText.setTextSize(15);
-                        dishText.setTypeface(dishText.getTypeface(), Typeface.NORMAL);
-
-                        row.addView(bulletIcon);
-                        row.addView(dishText);
-
-                        // Special item highlight tag
-                        String lower = dishName.toLowerCase(Locale.ENGLISH);
-                        String tagLabel = null;
-                        if (lower.contains("chicken") || lower.contains("egg") || lower.contains("omelette") || lower.contains("fish")) {
-                            tagLabel = "NON-VEG";
-                        } else if (lower.contains("ice cream") || lower.contains("jamun") || lower.contains("halwa") || lower.contains("payasam") || lower.contains("cake")) {
-                            tagLabel = "DESSERT";
-                        } else if (lower.contains("shake") || lower.contains("lassi") || lower.contains("juice") || lower.contains("tea") || lower.contains("coffee") || lower.contains("milk")) {
-                            tagLabel = "BEVERAGE";
-                        } else if (lower.contains("biryani") || lower.contains("paneer") || lower.contains("dosa") || lower.contains("paratha") || lower.contains("poori")) {
-                            tagLabel = "SPECIAL";
-                        }
-
-                        if (tagLabel != null) {
-                            TextView tagView = new TextView(getContext());
-                            tagView.setText(tagLabel);
-                            tagView.setTextSize(9);
-                            tagView.setTypeface(tagView.getTypeface(), Typeface.BOLD);
-                            tagView.setBackground(ContextCompat.getDrawable(requireContext(), R.drawable.background_pill_badge));
-                            tagView.setPadding((int) (8 * density), (int) (2 * density), (int) (8 * density), (int) (2 * density));
-                            row.addView(tagView);
-                        }
-
-                        layoutMealDishesContainer.addView(row);
-
-                        // Hairline separator between dishes
-                        if (i < items.length - 1) {
-                            View divider = new View(getContext());
-                            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
-                                    LinearLayout.LayoutParams.MATCH_PARENT, (int) (1 * density)
-                            );
-                            dividerParams.setMargins((int) (28 * density), 0, 0, 0);
-                            divider.setLayoutParams(dividerParams);
-                            divider.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.surface_50));
-                            layoutMealDishesContainer.addView(divider);
-                        }
+            if (hostelData != null && hostelData.has("meals")) {
+                JSONObject mealsObj = hostelData.getJSONObject("meals");
+                if (mealsObj.has(currentMenuKey)) {
+                    JSONObject menuObj = mealsObj.getJSONObject(currentMenuKey);
+                    String dayKey = DAY_KEYS[dayOfWeek];
+                    if (menuObj.has(dayKey)) {
+                        JSONObject dayObj = menuObj.getJSONObject(dayKey);
+                        mealRaw = dayObj.optString(mealField, "");
                     }
                 }
             }
-        } catch (JSONException e) {
+        } catch (Exception e) {
             Log.e(TAG, "Error parsing meals data", e);
-            if (textMealContent != null) {
-                textMealContent.setVisibility(View.VISIBLE);
-                textMealContent.setText("Data unavailable");
+        }
+
+        if (mealRaw == null || mealRaw.trim().isEmpty() || mealRaw.equalsIgnoreCase("Not available")) {
+            View emptyView = getLayoutInflater().inflate(R.layout.layout_meal_empty_state, layoutMealDishesContainer, false);
+            View buttonImport = emptyView.findViewById(R.id.button_empty_import_ai);
+            if (buttonImport != null) {
+                buttonImport.setOnClickListener(v -> {
+                    HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
+                        loadHostelData();
+                        updateDayAndMenu();
+                        updateLaundryUI();
+                    });
+                });
+            }
+            layoutMealDishesContainer.addView(emptyView);
+            return;
+        }
+
+        String[] items = mealRaw.split(",\\s*");
+        for (int i = 0; i < items.length; i++) {
+            String dishName = items[i].trim();
+            if (dishName.isEmpty()) continue;
+
+            LinearLayout row = new LinearLayout(getContext());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, (int) (6 * density), 0, (int) (6 * density));
+
+            // Dish bullet icon
+            ImageView bulletIcon = new ImageView(getContext());
+            LinearLayout.LayoutParams bulletParams = new LinearLayout.LayoutParams(
+                    (int) (18 * density), (int) (18 * density)
+            );
+            bulletParams.setMarginEnd((int) (10 * density));
+            bulletIcon.setLayoutParams(bulletParams);
+            bulletIcon.setImageResource(R.drawable.ic_restaurant);
+            bulletIcon.setImageTintList(ContextCompat.getColorStateList(requireContext(), R.color.secondary_75));
+
+            // Dish Name
+            TextView dishText = new TextView(getContext());
+            LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
+            );
+            dishText.setLayoutParams(textParams);
+            dishText.setText(dishName);
+            dishText.setTextSize(15);
+            dishText.setTypeface(dishText.getTypeface(), Typeface.NORMAL);
+
+            row.addView(bulletIcon);
+            row.addView(dishText);
+
+            // Special item highlight tag
+            String lower = dishName.toLowerCase(Locale.ENGLISH);
+            String tagLabel = null;
+            if (lower.contains("chicken") || lower.contains("egg") || lower.contains("omelette") || lower.contains("fish")) {
+                tagLabel = "NON-VEG";
+            } else if (lower.contains("ice cream") || lower.contains("jamun") || lower.contains("halwa") || lower.contains("payasam") || lower.contains("cake")) {
+                tagLabel = "DESSERT";
+            } else if (lower.contains("shake") || lower.contains("lassi") || lower.contains("juice") || lower.contains("tea") || lower.contains("coffee") || lower.contains("milk")) {
+                tagLabel = "BEVERAGE";
+            } else if (lower.contains("biryani") || lower.contains("paneer") || lower.contains("dosa") || lower.contains("paratha") || lower.contains("poori")) {
+                tagLabel = "SPECIAL";
+            }
+
+            if (tagLabel != null) {
+                TextView tagView = new TextView(getContext());
+                tagView.setText(tagLabel);
+                tagView.setTextSize(9);
+                tagView.setTypeface(tagView.getTypeface(), Typeface.BOLD);
+                tagView.setBackground(ContextCompat.getDrawable(requireContext(), R.drawable.background_pill_badge));
+                tagView.setPadding((int) (8 * density), (int) (2 * density), (int) (8 * density), (int) (2 * density));
+                row.addView(tagView);
+            }
+
+            layoutMealDishesContainer.addView(row);
+
+            // Hairline separator between dishes
+            if (i < items.length - 1) {
+                View divider = new View(getContext());
+                LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, (int) (1 * density)
+                );
+                dividerParams.setMargins((int) (28 * density), 0, 0, 0);
+                divider.setLayoutParams(dividerParams);
+                divider.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.surface_50));
+                layoutMealDishesContainer.addView(divider);
             }
         }
     }
@@ -616,7 +622,15 @@ public class MealsLaundryFragment extends Fragment {
 
         try {
             int roomNum = Integer.parseInt(roomStr.trim());
-            JSONObject laundryObj = hostelData.getJSONObject("laundry");
+            JSONObject laundryObj = hostelData.optJSONObject("laundry");
+            if (laundryObj == null || laundryObj.length() == 0) {
+                textLaundryNextDate.setText("No Schedule");
+                if (textLaundryDayName != null) textLaundryDayName.setText("Schedule Empty");
+                if (textLaundryDaysLeft != null) textLaundryDaysLeft.setText("Empty");
+                if (textLaundrySlotRange != null) textLaundrySlotRange.setText("Import schedule with AI");
+                if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Tap 'AI Import' below to add circular");
+                return;
+            }
             Calendar cal = Calendar.getInstance();
 
             int foundDay = -1;
@@ -697,12 +711,8 @@ public class MealsLaundryFragment extends Fragment {
                     }
                 }
             }
-        } catch (NumberFormatException e) {
-            textLaundryNextDate.setText("Invalid room number");
-            if (textLaundryDaysLeft != null) textLaundryDaysLeft.setText("");
-            if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Invalid room");
-        } catch (JSONException e) {
-            Log.e(TAG, "Error parsing laundry JSON", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing laundry data", e);
         }
     }
 

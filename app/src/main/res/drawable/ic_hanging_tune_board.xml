@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="38dp"
+    android:height="44dp"
+    android:viewportWidth="38"
+    android:viewportHeight="44">
+
+  <!-- Top Hanging Nail / Pin -->
+  <path
+      android:fillColor="?attr/colorSecondary"
+      android:pathData="M19,3m-2.2,0a2.2,2.2 0,1 1,4.4 0a2.2,2.2 0,1 1,-4.4 0" />
+
+  <!-- Reverse-V Hanging Ropes (from nail to board left and right corners) -->
+  <path
+      android:strokeColor="?attr/colorOutline"
+      android:strokeWidth="1.6"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M19,4 L8,13 M19,4 L30,13" />
+
+  <!-- Board Ring Fasteners -->
+  <path
+      android:fillColor="?attr/colorSecondary"
+      android:pathData="M8,13m-1.2,0a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0 M30,13m-1.2,0a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0" />
+
+  <!-- Hanging Signboard Background -->
+  <path
+      android:fillColor="?attr/colorSurfaceVariant"
+      android:strokeColor="?attr/colorPrimary"
+      android:strokeWidth="1.2"
+      android:pathData="M7,14 H31 C33.2,14 35,15.8 35,18 V37 C35,39.2 33.2,41 31,41 H7 C4.8,41 3,39.2 3,37 V18 C3,15.8 4.8,14 7,14 Z" />
+
+  <!-- Inside Icon: AI Tune / Adjust Slider Icon -->
+  <path
+      android:fillColor="?attr/colorPrimary"
+      android:pathData="M10,23 H18 M22,23 H28 M18,20 V26 M10,32 H14 M18,32 H28 M18,29 V35"
+      android:strokeColor="?attr/colorPrimary"
+      android:strokeWidth="1.8"
+      android:strokeLineCap="round" />
+
+  <!-- Sparkle dot on board corner -->
+  <path
+      android:fillColor="?attr/colorSecondary"
+      android:pathData="M30,18m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+
+</vector>
