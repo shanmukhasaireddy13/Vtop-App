@@ -75,6 +75,7 @@ public class MealsLaundryFragment extends Fragment {
     private TextView textLaundryDayName;
     private TextView textLaundryDaysLeft;
     private TextView textLaundrySlotRange;
+    private TextView textLaundryFollowingDate;
     private View layoutLaundrySetup;
     private View layoutLaundryActive;
     private MaterialButton buttonSaveRoom;
@@ -323,7 +324,7 @@ public class MealsLaundryFragment extends Fragment {
 
         if (textDateHint != null && !isSameDay) {
             SimpleDateFormat monthYearSdf = new SimpleDateFormat("MMMM yyyy", Locale.getDefault());
-            textDateHint.setText("Viewing " + monthYearSdf.format(selectedCalendar.getTime()));
+            textDateHint.setText("Viewing " + monthYearSdf.format(selectedCalendar.getTime()) + " • Menu " + menuNum + " rotation");
         }
 
         renderMealContent();
@@ -492,6 +493,7 @@ public class MealsLaundryFragment extends Fragment {
         textLaundryDayName = view.findViewById(R.id.text_laundry_day_name);
         textLaundryDaysLeft = view.findViewById(R.id.text_laundry_days_left);
         textLaundrySlotRange = view.findViewById(R.id.text_laundry_slot_range);
+        textLaundryFollowingDate = view.findViewById(R.id.text_laundry_following_date);
         layoutLaundrySetup = view.findViewById(R.id.layout_laundry_setup);
         layoutLaundryActive = view.findViewById(R.id.layout_laundry_active);
         buttonSaveRoom = view.findViewById(R.id.button_save_room);
@@ -544,29 +546,38 @@ public class MealsLaundryFragment extends Fragment {
             int roomNum = Integer.parseInt(roomStr.trim());
             JSONObject laundryObj = hostelData.getJSONObject("laundry");
             Calendar cal = Calendar.getInstance();
-            int currentDay = cal.get(Calendar.DAY_OF_MONTH);
-            int maxDays = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
 
             int foundDay = -1;
             int daysLeft = -1;
             String matchedSlot = "";
 
-            for (int i = 0; i <= 31; i++) {
-                int d = ((currentDay + i - 1) % maxDays) + 1;
+            Calendar followingCal = null;
+
+            // Search ahead up to 60 days to find both 1st (Next) and 2nd (Following) upcoming laundry drop-off dates
+            for (int i = 0; i <= 60; i++) {
+                Calendar checkCal = (Calendar) cal.clone();
+                checkCal.add(Calendar.DAY_OF_MONTH, i);
+                int d = checkCal.get(Calendar.DAY_OF_MONTH);
                 String rangeStr = laundryObj.optString(String.valueOf(d), "");
+
                 if (isRoomInRange(roomNum, rangeStr)) {
-                    foundDay = d;
-                    daysLeft = i;
-                    matchedSlot = rangeStr;
-                    break;
+                    if (foundDay == -1) {
+                        foundDay = d;
+                        daysLeft = i;
+                        matchedSlot = rangeStr;
+                    } else if (followingCal == null) {
+                        followingCal = checkCal;
+                        break;
+                    }
                 }
             }
 
             if (foundDay == -1) {
-                textLaundryNextDate.setText("Not scheduled this month");
+                textLaundryNextDate.setText("Not scheduled");
                 if (textLaundryDayName != null) textLaundryDayName.setText("");
                 if (textLaundryDaysLeft != null) textLaundryDaysLeft.setText("No slot");
                 if (textLaundrySlotRange != null) textLaundrySlotRange.setText("");
+                if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Continuous 6-day cycle");
             } else {
                 String suffix = "th";
                 if (foundDay % 10 == 1 && foundDay != 11) suffix = "st";
@@ -594,12 +605,30 @@ public class MealsLaundryFragment extends Fragment {
                 }
 
                 if (textLaundrySlotRange != null) {
-                    textLaundrySlotRange.setText("Slot: " + matchedSlot);
+                    String cleanSlot = matchedSlot.replace("-", "–").trim();
+                    textLaundrySlotRange.setText("Rooms: " + cleanSlot);
+                }
+
+                if (textLaundryFollowingDate != null) {
+                    if (followingCal != null) {
+                        int fDay = followingCal.get(Calendar.DAY_OF_MONTH);
+                        String fSuffix = "th";
+                        if (fDay % 10 == 1 && fDay != 11) fSuffix = "st";
+                        else if (fDay % 10 == 2 && fDay != 12) fSuffix = "nd";
+                        else if (fDay % 10 == 3 && fDay != 13) fSuffix = "rd";
+
+                        String fMonth = followingCal.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.getDefault());
+                        String fDayOfWeek = followingCal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+                        textLaundryFollowingDate.setText(String.format(Locale.getDefault(), "%s, %d%s %s", fDayOfWeek, fDay, fSuffix, fMonth));
+                    } else {
+                        textLaundryFollowingDate.setText("Continuous 6-day cycle");
+                    }
                 }
             }
         } catch (NumberFormatException e) {
             textLaundryNextDate.setText("Invalid room number");
             if (textLaundryDaysLeft != null) textLaundryDaysLeft.setText("");
+            if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Invalid room");
         } catch (JSONException e) {
             Log.e(TAG, "Error parsing laundry JSON", e);
         }

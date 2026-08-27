@@ -175,7 +175,7 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- Left: Hero Date -->
+                    <!-- Left: Hero Date & Room Slot Range Badge -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -210,6 +210,21 @@
                             android:textColor="?attr/colorSecondary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/text_laundry_slot_range"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/background_pill_badge"
+                            android:paddingStart="10dp"
+                            android:paddingTop="3dp"
+                            android:paddingEnd="10dp"
+                            android:paddingBottom="3dp"
+                            android:text="Rooms: 1128 – 1523"
+                            android:textColor="?attr/colorOnSecondaryContainer"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
 
                     <!-- Right: Countdown Status Box -->
@@ -221,30 +236,27 @@
                         android:background="@drawable/background_dish_item"
                         android:gravity="center"
                         android:orientation="vertical"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="18dp">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_laundry"
+                            app:tint="?attr/colorPrimary" />
 
                         <TextView
                             android:id="@+id/text_laundry_days_left"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
                             android:gravity="center"
                             android:text="Tomorrow"
                             android:textAlignment="center"
                             android:textColor="?attr/colorPrimary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/text_laundry_slot_range"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:gravity="center"
-                            android:text="Slot: 323 - 514"
-                            android:textAlignment="center"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
                     </LinearLayout>
 
                 </LinearLayout>
@@ -256,34 +268,37 @@
                     android:layout_marginBottom="14dp"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Bottom Timing Metrics Row -->
+                <!-- Bottom: Following Cycle Date Row -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:drawableStart="@drawable/ic_clock"
-                        android:drawablePadding="6dp"
-                        android:drawableTint="?attr/colorSecondary"
-                        android:text="07:30 – 10:00 AM"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_calendar_today"
+                        app:tint="?attr/colorPrimary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:drawableStart="@drawable/ic_done"
-                        android:drawablePadding="6dp"
-                        android:drawableTint="?attr/colorSecondary"
-                        android:text="Max 10 Items"
+                        android:layout_marginStart="8dp"
+                        android:text="Following Drop-off:"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/text_laundry_following_date"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:text="Saturday, 5th Sep"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
