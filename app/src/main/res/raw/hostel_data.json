@@ -1,7 +1,7 @@
 {
+  "year": 0,
+  "month": 0,
   "laundry": {},
-  "meals": {
-    "menu_1": {},
-    "menu_2": {}
-  }
+  "meal_schedule": {},
+  "meals": {}
 }

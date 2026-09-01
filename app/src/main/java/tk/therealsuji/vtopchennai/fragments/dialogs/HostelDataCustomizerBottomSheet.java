@@ -72,7 +72,7 @@ public class HostelDataCustomizerBottomSheet extends BottomSheetDialogFragment {
         });
 
         view.findViewById(R.id.button_copy_json_format).setOnClickListener(v -> {
-            String sampleFormat = "{\n  \"laundry\": {\n    \"1\": \"101 - 322\",\n    \"2\": \"\",\n    \"3\": \"323 - 514\"\n  },\n  \"meals\": {\n    \"menu_1\": {\n      \"monday\": {\n        \"breakfast\": \"Idli, Sambar, Chutney\",\n        \"lunch\": \"Rice, Dal, Curd\",\n        \"snacks\": \"Samosa, Tea\",\n        \"dinner\": \"Chapati, Paneer\"\n      }\n    }\n  }\n}";
+            String sampleFormat = "{\n  \"year\": 2026,\n  \"month\": 9,\n  \"laundry\": {\n    \"1\": \"101 - 322\",\n    \"2\": \"\",\n    \"3\": \"323 - 514\"\n  },\n  \"meal_schedule\": {\n    \"1\": \"menu_2\",\n    \"2\": \"menu_2\",\n    \"7\": \"menu_1\"\n  },\n  \"meals\": {\n    \"menu_1\": {\n      \"monday\": {\n        \"breakfast\": \"Idli, Sambar, Chutney\",\n        \"lunch\": \"Rice, Dal, Curd\",\n        \"snacks\": \"Samosa, Tea\",\n        \"dinner\": \"Chapati, Paneer\"\n      }\n    },\n    \"menu_2\": {\n      \"monday\": {\n        \"breakfast\": \"Poori, Aloo Masala\",\n        \"lunch\": \"Rice, Dal, Curd\",\n        \"snacks\": \"Veg Puff, Tea\",\n        \"dinner\": \"Paratha, Dal\"\n      }\n    }\n  }\n}";
             copyToClipboard("Hostel JSON Format", sampleFormat);
             Toast.makeText(requireContext(), "JSON schema template copied!", Toast.LENGTH_SHORT).show();
         });
@@ -97,7 +97,7 @@ public class HostelDataCustomizerBottomSheet extends BottomSheetDialogFragment {
             if (listener != null) {
                 listener.onHostelDataUpdated();
             }
-            Toast.makeText(requireContext(), "Reset to official August 2026 schedule.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Reset to default template.", Toast.LENGTH_SHORT).show();
             dismiss();
         });
 

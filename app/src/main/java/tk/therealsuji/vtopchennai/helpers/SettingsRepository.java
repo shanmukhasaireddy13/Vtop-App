@@ -339,17 +339,26 @@ public class SettingsRepository {
     }
 
     public static String getAiPromptTemplate() {
-        return "Please extract the hostel mess menu and/or laundry schedule from the attached image(s) and return ONLY a valid JSON object strictly matching this schema without any markdown formatting or commentary:\n\n" +
+        return "Please extract the hostel mess menu, meal schedule, and/or laundry schedule from the attached image(s) and return ONLY a valid JSON object strictly matching this schema without any markdown formatting or commentary:\n\n" +
                 "{\n" +
+                "  \"year\": 2026,\n" +
+                "  \"month\": 9,\n" +
                 "  \"laundry\": {\n" +
                 "    \"1\": \"101 - 322\",\n" +
                 "    \"2\": \"\",\n" +
                 "    \"3\": \"323 - 514\",\n" +
                 "    \"4\": \"515 - 715\",\n" +
-                "    \"5\": \"716 - 918\",\n" +
-                "    \"6\": \"919 - 1127\",\n" +
-                "    \"7\": \"1128 - 1523\",\n" +
-                "    \"8\": \"101 - 322\"\n" +
+                "    \"5\": \"716 - 926\",\n" +
+                "    \"6\": \"927 - 1127\",\n" +
+                "    \"7\": \"1128 - 1523\"\n" +
+                "  },\n" +
+                "  \"meal_schedule\": {\n" +
+                "    \"1\": \"menu_2\",\n" +
+                "    \"2\": \"menu_2\",\n" +
+                "    \"7\": \"menu_1\",\n" +
+                "    \"14\": \"menu_2\",\n" +
+                "    \"21\": \"menu_1\",\n" +
+                "    \"28\": \"menu_2\"\n" +
                 "  },\n" +
                 "  \"meals\": {\n" +
                 "    \"menu_1\": {\n" +
@@ -378,7 +387,7 @@ public class SettingsRepository {
                 "  }\n" +
                 "}\n\n" +
                 "Formatting Guidelines:\n" +
-                "- menu_1 is Cycle 1 (Week 1 & 3), menu_2 is Cycle 2 (Week 2 & 4). If the hostel only has 1 weekly menu, duplicate the 7 days into both menu_1 and menu_2.\n" +
+                "- meal_schedule maps each day-of-month string (\"1\" through \"31\") to a menu key (e.g. \"menu_1\", \"menu_2\", or special event \"special_1\").\n" +
                 "- All day names must be lowercase: monday, tuesday, wednesday, thursday, friday, saturday, sunday.\n" +
                 "- All meal categories must be lowercase: breakfast, lunch, snacks, dinner.\n" +
                 "- For laundry: keys are day-of-month strings (\"1\" through \"31\"), values are room number ranges (e.g. \"101 - 322\") or empty string \"\" for no drop-off days.\n" +

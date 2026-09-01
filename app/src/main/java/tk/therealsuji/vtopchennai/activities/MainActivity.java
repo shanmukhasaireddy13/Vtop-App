@@ -245,11 +245,8 @@ public class MainActivity extends AppCompatActivity {
 
         this.bottomNavigationView = findViewById(R.id.bottom_navigation);
 
-        FeatureFlagsRepository.initAndFetch(this);
-        if (bottomNavigationView != null && bottomNavigationView.getMenu() != null) {
-            bottomNavigationView.getMenu().findItem(R.id.item_meals_laundry)
-                    .setVisible(FeatureFlagsRepository.isMealsLaundryEnabled(this));
-        }
+        updateFeatureFlagUI();
+        FeatureFlagsRepository.initAndFetch(this, this::updateFeatureFlagUI);
 
         Bundle customInsets = new Bundle();
         customInsets.putInt("systemWindowInsetLeft", 0);
@@ -468,6 +465,22 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         this.vtopHelper.unbind();
+    }
+
+    private void updateFeatureFlagUI() {
+        if (bottomNavigationView != null && bottomNavigationView.getMenu() != null) {
+            boolean showMeals = FeatureFlagsRepository.isMealsLaundryEnabled(this);
+            bottomNavigationView.getMenu().findItem(R.id.item_meals_laundry).setVisible(showMeals);
+        }
+
+        if (FeatureFlagsRepository.isMaintenanceMode(this) && !isFinishing()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Under Maintenance")
+                    .setMessage(FeatureFlagsRepository.getMaintenanceMessage(this))
+                    .setCancelable(false)
+                    .setPositiveButton("Close App", (dialog, which) -> finish())
+                    .show();
+        }
     }
 
     @Override

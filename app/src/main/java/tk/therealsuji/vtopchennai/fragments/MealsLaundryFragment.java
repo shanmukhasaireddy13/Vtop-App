@@ -30,7 +30,6 @@ import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.analytics.FirebaseAnalytics;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.InputStream;
@@ -42,11 +41,98 @@ import java.util.Locale;
 import tk.therealsuji.vtopchennai.R;
 import tk.therealsuji.vtopchennai.adapters.MealsLaundryPagerAdapter;
 import tk.therealsuji.vtopchennai.helpers.FeatureFlagsRepository;
-import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 
 public class MealsLaundryFragment extends Fragment {
 
     private static final String TAG = "MealsLaundryFragment";
+
+    // --- Domain Models & Enums ---
+
+    private enum MainTab {
+        MEALS(R.drawable.ic_restaurant, R.string.tab_meals),
+        LAUNDRY(R.drawable.ic_laundry, R.string.tab_laundry);
+
+        final int iconRes;
+        final int labelRes;
+
+        MainTab(int iconRes, int labelRes) {
+            this.iconRes = iconRes;
+            this.labelRes = labelRes;
+        }
+    }
+
+    public enum MealType {
+        BREAKFAST(0, R.string.tab_breakfast, R.drawable.ic_breakfast, "breakfast", R.string.breakfast_timings, R.string.breakfast_weekend_timings, 0, 10),
+        LUNCH(1, R.string.tab_lunch, R.drawable.ic_lunch, "lunch", R.string.lunch_timings, R.string.lunch_weekend_timings, R.string.lunch_notes, 15),
+        SNACKS(2, R.string.tab_snacks, R.drawable.ic_snacks, "snacks", R.string.snacks_timings, R.string.snacks_timings, 0, 18),
+        DINNER(3, R.string.tab_dinner, R.drawable.ic_dinner, "dinner", R.string.dinner_timings, R.string.dinner_timings, R.string.dinner_notes, 24);
+
+        public final int index;
+        public final int titleRes;
+        public final int iconRes;
+        public final String key;
+        public final int weekdayTimingRes;
+        public final int weekendTimingRes;
+        public final int notesRes;
+        public final int hourCutoff;
+
+        MealType(int index, int titleRes, int iconRes, String key, int weekdayTimingRes, int weekendTimingRes, int notesRes, int hourCutoff) {
+            this.index = index;
+            this.titleRes = titleRes;
+            this.iconRes = iconRes;
+            this.key = key;
+            this.weekdayTimingRes = weekdayTimingRes;
+            this.weekendTimingRes = weekendTimingRes;
+            this.notesRes = notesRes;
+            this.hourCutoff = hourCutoff;
+        }
+
+        public static MealType fromHour(int hour) {
+            for (MealType meal : values()) {
+                if (hour < meal.hourCutoff) return meal;
+            }
+            return DINNER;
+        }
+
+        public static MealType fromIndex(int index) {
+            for (MealType meal : values()) {
+                if (meal.index == index) return meal;
+            }
+            return BREAKFAST;
+        }
+    }
+
+    private enum DishCategory {
+        NON_VEG("NON-VEG", "chicken", "egg", "omelette", "fish", "mutton", "prawn"),
+        DESSERT("DESSERT", "ice cream", "jamun", "halwa", "payasam", "cake", "kheer"),
+        BEVERAGE("BEVERAGE", "shake", "lassi", "juice", "tea", "coffee", "milk"),
+        SPECIAL("SPECIAL", "biryani", "paneer", "dosa", "paratha", "poori", "fried rice");
+
+        final String label;
+        final String[] keywords;
+
+        DishCategory(String label, String... keywords) {
+            this.label = label;
+            this.keywords = keywords;
+        }
+
+        static String findTag(String dishName) {
+            if (dishName == null) return null;
+            String lower = dishName.toLowerCase(Locale.ENGLISH);
+            for (DishCategory cat : values()) {
+                for (String kw : cat.keywords) {
+                    if (lower.contains(kw)) return cat.label;
+                }
+            }
+            return null;
+        }
+    }
+
+    private static final String[] DAY_KEYS = {
+            "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+    };
+
+    // --- View State & References ---
 
     private AppBarLayout appBarLayout;
     private ViewPager2 viewPager;
@@ -55,7 +141,7 @@ public class MealsLaundryFragment extends Fragment {
     private JSONObject hostelData;
     private String currentMenuKey;
     private Calendar selectedCalendar = Calendar.getInstance();
-    private int selectedMealIndex = 0;
+    private MealType selectedMeal = MealType.BREAKFAST;
 
     // View References for Meals
     private View cardDatePicker;
@@ -71,7 +157,6 @@ public class MealsLaundryFragment extends Fragment {
     private TextView textMealTiming;
     private TextView textMealStatusBadge;
     private LinearLayout layoutMealDishesContainer;
-    private TextView textMealContent;
     private View layoutMealSpecialNotes;
     private TextView textMealSpecialNotes;
 
@@ -88,10 +173,6 @@ public class MealsLaundryFragment extends Fragment {
     private MaterialButton buttonSaveRoom;
     private MaterialButton buttonEditRoom;
 
-    private static final String[] DAY_KEYS = {
-            "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
-    };
-
     public MealsLaundryFragment() {
         // Required empty public constructor
     }
@@ -99,8 +180,6 @@ public class MealsLaundryFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-
-        // Firebase Analytics Logging
         Bundle bundle = new Bundle();
         bundle.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "MealsLaundryFragment");
         bundle.putString(FirebaseAnalytics.Param.SCREEN_NAME, "Meals & Laundry");
@@ -154,20 +233,28 @@ public class MealsLaundryFragment extends Fragment {
 
         View buttonCustomize = root.findViewById(R.id.button_customize_hostel_data);
         if (buttonCustomize != null) {
-            buttonCustomize.setVisibility(FeatureFlagsRepository.isAiCustomizerEnabled(getContext()) ? View.VISIBLE : View.GONE);
-            buttonCustomize.setOnClickListener(v -> {
-                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
-                    loadHostelData();
-                    updateDayAndMenu();
-                    updateLaundryUI();
-                });
-            });
+            updateCustomizerVisibility(buttonCustomize);
+            FeatureFlagsRepository.addListener(() -> updateCustomizerVisibility(buttonCustomize));
+            buttonCustomize.setOnClickListener(v -> openCustomizerSheet());
         }
 
         loadHostelData();
         setupViewPager(root);
 
         return root;
+    }
+
+    private void updateCustomizerVisibility(View buttonCustomize) {
+        if (buttonCustomize == null || getContext() == null) return;
+        buttonCustomize.setVisibility(FeatureFlagsRepository.isAiCustomizerEnabled(getContext()) ? View.VISIBLE : View.GONE);
+    }
+
+    private void openCustomizerSheet() {
+        HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
+            loadHostelData();
+            updateDayAndMenu();
+            updateLaundryUI();
+        });
     }
 
     private void loadHostelData() {
@@ -183,14 +270,10 @@ public class MealsLaundryFragment extends Fragment {
         } catch (Exception ignored) {
         }
 
-        try {
-            InputStream is = getResources().openRawResource(R.raw.hostel_data);
-            int size = is.available();
-            byte[] buffer = new byte[size];
+        try (InputStream is = getResources().openRawResource(R.raw.hostel_data)) {
+            byte[] buffer = new byte[is.available()];
             is.read(buffer);
-            is.close();
-            String json = new String(buffer, StandardCharsets.UTF_8);
-            hostelData = new JSONObject(json);
+            hostelData = new JSONObject(new String(buffer, StandardCharsets.UTF_8));
         } catch (Exception ex) {
             Log.e(TAG, "Failed to load hostel data JSON", ex);
         }
@@ -198,19 +281,15 @@ public class MealsLaundryFragment extends Fragment {
 
     private void setupViewPager(View root) {
         TabLayout tabLayoutMain = root.findViewById(R.id.tab_layout_main);
-
         MealsLaundryPagerAdapter adapter = new MealsLaundryPagerAdapter(this);
         viewPager.setAdapter(adapter);
 
         tabLayoutMediator = new TabLayoutMediator(tabLayoutMain, viewPager, (tab, position) -> {
-            if (position == 0) {
-                tab.setIcon(R.drawable.ic_restaurant);
-                tab.setContentDescription(getString(R.string.tab_meals));
-                TooltipCompat.setTooltipText(tab.view, getString(R.string.tab_meals));
-            } else {
-                tab.setIcon(R.drawable.ic_laundry);
-                tab.setContentDescription(getString(R.string.tab_laundry));
-                TooltipCompat.setTooltipText(tab.view, getString(R.string.tab_laundry));
+            if (position >= 0 && position < MainTab.values().length) {
+                MainTab mainTab = MainTab.values()[position];
+                tab.setIcon(mainTab.iconRes);
+                tab.setContentDescription(getString(mainTab.labelRes));
+                TooltipCompat.setTooltipText(tab.view, getString(mainTab.labelRes));
             }
         });
         tabLayoutMediator.attach();
@@ -231,14 +310,12 @@ public class MealsLaundryFragment extends Fragment {
         textMealTiming = view.findViewById(R.id.text_meal_timing);
         textMealStatusBadge = view.findViewById(R.id.text_meal_status_badge);
         layoutMealDishesContainer = view.findViewById(R.id.layout_meal_dishes_container);
-        textMealContent = view.findViewById(R.id.text_meal_content);
         layoutMealSpecialNotes = view.findViewById(R.id.layout_meal_special_notes);
         textMealSpecialNotes = view.findViewById(R.id.text_meal_special_notes);
 
-        // Date Picker Trigger
-        View.OnClickListener openDatePickerListener = v -> showDatePickerDialog();
-        if (cardDatePicker != null) cardDatePicker.setOnClickListener(openDatePickerListener);
-        if (buttonPickDate != null) buttonPickDate.setOnClickListener(openDatePickerListener);
+        View.OnClickListener openDatePicker = v -> showDatePickerDialog();
+        if (cardDatePicker != null) cardDatePicker.setOnClickListener(openDatePicker);
+        if (buttonPickDate != null) buttonPickDate.setOnClickListener(openDatePicker);
 
         if (buttonTodayQuick != null) {
             buttonTodayQuick.setOnClickListener(v -> {
@@ -247,35 +324,20 @@ public class MealsLaundryFragment extends Fragment {
             });
         }
 
-        // Setup Meal Time Tabs with equal dimensions
+        // Setup Meal Time Tabs from MealType enum
         tabLayoutMeals.removeAllTabs();
-        tabLayoutMeals.addTab(tabLayoutMeals.newTab().setText(R.string.tab_breakfast).setIcon(R.drawable.ic_breakfast));
-        tabLayoutMeals.addTab(tabLayoutMeals.newTab().setText(R.string.tab_lunch).setIcon(R.drawable.ic_lunch));
-        tabLayoutMeals.addTab(tabLayoutMeals.newTab().setText(R.string.tab_snacks).setIcon(R.drawable.ic_snacks));
-        tabLayoutMeals.addTab(tabLayoutMeals.newTab().setText(R.string.tab_dinner).setIcon(R.drawable.ic_dinner));
-
-        // Set initial meal selection based on current hour
-        Calendar now = Calendar.getInstance();
-        int currentHour = now.get(Calendar.HOUR_OF_DAY);
-        if (currentHour < 10) {
-            selectedMealIndex = 0; // Breakfast
-        } else if (currentHour < 15) {
-            selectedMealIndex = 1; // Lunch
-        } else if (currentHour < 18) {
-            selectedMealIndex = 2; // Snacks
-        } else {
-            selectedMealIndex = 3; // Dinner
+        for (MealType meal : MealType.values()) {
+            tabLayoutMeals.addTab(tabLayoutMeals.newTab().setText(meal.titleRes).setIcon(meal.iconRes));
         }
 
-        if (selectedMealIndex >= 0 && selectedMealIndex < tabLayoutMeals.getTabCount()) {
-            TabLayout.Tab mealTab = tabLayoutMeals.getTabAt(selectedMealIndex);
-            if (mealTab != null) mealTab.select();
-        }
+        selectedMeal = MealType.fromHour(Calendar.getInstance().get(Calendar.HOUR_OF_DAY));
+        TabLayout.Tab activeTab = tabLayoutMeals.getTabAt(selectedMeal.index);
+        if (activeTab != null) activeTab.select();
 
         tabLayoutMeals.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
-                selectedMealIndex = tab.getPosition();
+                selectedMeal = MealType.fromIndex(tab.getPosition());
                 renderMealContent();
             }
 
@@ -288,76 +350,60 @@ public class MealsLaundryFragment extends Fragment {
 
         View buttonAiImportMeals = view.findViewById(R.id.button_ai_import_meals);
         if (buttonAiImportMeals != null) {
-            buttonAiImportMeals.setOnClickListener(v -> {
-                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
-                    loadHostelData();
-                    updateDayAndMenu();
-                    updateLaundryUI();
-                });
-            });
+            buttonAiImportMeals.setOnClickListener(v -> openCustomizerSheet());
         }
 
         updateDayAndMenu();
     }
 
     private void showDatePickerDialog() {
-        int year = selectedCalendar.get(Calendar.YEAR);
-        int month = selectedCalendar.get(Calendar.MONTH);
-        int day = selectedCalendar.get(Calendar.DAY_OF_MONTH);
-
         DatePickerDialog datePickerDialog = new DatePickerDialog(
                 requireContext(),
-                (view, selectedYear, selectedMonth, selectedDayOfMonth) -> {
-                    selectedCalendar.set(Calendar.YEAR, selectedYear);
-                    selectedCalendar.set(Calendar.MONTH, selectedMonth);
-                    selectedCalendar.set(Calendar.DAY_OF_MONTH, selectedDayOfMonth);
+                (view, year, month, day) -> {
+                    selectedCalendar.set(Calendar.YEAR, year);
+                    selectedCalendar.set(Calendar.MONTH, month);
+                    selectedCalendar.set(Calendar.DAY_OF_MONTH, day);
                     updateDayAndMenu();
                 },
-                year,
-                month,
-                day
+                selectedCalendar.get(Calendar.YEAR),
+                selectedCalendar.get(Calendar.MONTH),
+                selectedCalendar.get(Calendar.DAY_OF_MONTH)
         );
         datePickerDialog.show();
     }
 
     private void updateDayAndMenu() {
-        int weekOfYear = selectedCalendar.get(Calendar.WEEK_OF_YEAR);
-        int menuNum = (weekOfYear % 2 == 0) ? 1 : 2;
-        currentMenuKey = "menu_" + menuNum;
+        int dayOfMonth = selectedCalendar.get(Calendar.DAY_OF_MONTH);
 
-        // Format Date e.g. "Thursday, 27 Aug"
+        // Resolve menu key from meal_schedule if present
+        String menuKey = null;
+        if (hostelData != null && hostelData.has("meal_schedule")) {
+            JSONObject scheduleObj = hostelData.optJSONObject("meal_schedule");
+            if (scheduleObj != null && scheduleObj.has(String.valueOf(dayOfMonth))) {
+                menuKey = scheduleObj.optString(String.valueOf(dayOfMonth), "");
+            }
+        }
+
+        // Fallback for legacy JSON or missing date mapping
+        if (menuKey == null || menuKey.isEmpty()) {
+            int weekOfYear = selectedCalendar.get(Calendar.WEEK_OF_YEAR);
+            int menuNum = (weekOfYear % 2 == 0) ? 1 : 2;
+            menuKey = "menu_" + menuNum;
+        }
+
+        currentMenuKey = menuKey;
+        String menuDisplay = formatMenuDisplayName(currentMenuKey);
+
         SimpleDateFormat sdf = new SimpleDateFormat("EEEE, d MMM", Locale.getDefault());
-        String formattedDate = sdf.format(selectedCalendar.getTime());
-
         if (textDayDateIndicator != null) {
-            textDayDateIndicator.setText(formattedDate);
+            textDayDateIndicator.setText(sdf.format(selectedCalendar.getTime()));
         }
 
         Calendar todayCal = Calendar.getInstance();
-        boolean isSameDay = (todayCal.get(Calendar.YEAR) == selectedCalendar.get(Calendar.YEAR)
-                && todayCal.get(Calendar.DAY_OF_YEAR) == selectedCalendar.get(Calendar.DAY_OF_YEAR));
-
-        Calendar tomorrowCal = (Calendar) todayCal.clone();
-        tomorrowCal.add(Calendar.DAY_OF_YEAR, 1);
-        boolean isTomorrow = (tomorrowCal.get(Calendar.YEAR) == selectedCalendar.get(Calendar.YEAR)
-                && tomorrowCal.get(Calendar.DAY_OF_YEAR) == selectedCalendar.get(Calendar.DAY_OF_YEAR));
-
-        Calendar yesterdayCal = (Calendar) todayCal.clone();
-        yesterdayCal.add(Calendar.DAY_OF_YEAR, -1);
-        boolean isYesterday = (yesterdayCal.get(Calendar.YEAR) == selectedCalendar.get(Calendar.YEAR)
-                && yesterdayCal.get(Calendar.DAY_OF_YEAR) == selectedCalendar.get(Calendar.DAY_OF_YEAR));
+        boolean isSameDay = isSameDay(todayCal, selectedCalendar);
 
         if (textRelativeDayBadge != null) {
-            if (isSameDay) {
-                textRelativeDayBadge.setText("Today's Menu");
-            } else if (isTomorrow) {
-                textRelativeDayBadge.setText("Tomorrow's Menu");
-            } else if (isYesterday) {
-                textRelativeDayBadge.setText("Yesterday's Menu");
-            } else {
-                SimpleDateFormat daySdf = new SimpleDateFormat("EEEE", Locale.getDefault());
-                textRelativeDayBadge.setText(daySdf.format(selectedCalendar.getTime()) + "'s Menu");
-            }
+            textRelativeDayBadge.setText(getRelativeDayLabel(selectedCalendar, todayCal) + " • " + menuDisplay);
         }
 
         if (layoutDateActionsRow != null) {
@@ -366,10 +412,46 @@ public class MealsLaundryFragment extends Fragment {
 
         if (textDateHint != null && !isSameDay) {
             SimpleDateFormat monthYearSdf = new SimpleDateFormat("MMMM yyyy", Locale.getDefault());
-            textDateHint.setText("Viewing " + monthYearSdf.format(selectedCalendar.getTime()) + " • Menu " + menuNum + " rotation");
+            textDateHint.setText("Viewing " + monthYearSdf.format(selectedCalendar.getTime()) + " • " + menuDisplay);
         }
 
         renderMealContent();
+    }
+
+    private String formatMenuDisplayName(String menuKey) {
+        if (menuKey == null || menuKey.isEmpty()) return "Menu";
+        if (menuKey.equalsIgnoreCase("menu_1")) return "Menu 1";
+        if (menuKey.equalsIgnoreCase("menu_2")) return "Menu 2";
+        if (menuKey.startsWith("menu_")) return "Menu " + menuKey.substring(5);
+        if (menuKey.startsWith("special_")) return "Special " + menuKey.substring(8);
+
+        String[] parts = menuKey.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p.length() > 0) {
+                sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    private String getRelativeDayLabel(Calendar target, Calendar today) {
+        if (isSameDay(target, today)) return "Today's Menu";
+
+        Calendar tomorrow = (Calendar) today.clone();
+        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+        if (isSameDay(target, tomorrow)) return "Tomorrow's Menu";
+
+        Calendar yesterday = (Calendar) today.clone();
+        yesterday.add(Calendar.DAY_OF_YEAR, -1);
+        if (isSameDay(target, yesterday)) return "Yesterday's Menu";
+
+        return new SimpleDateFormat("EEEE", Locale.getDefault()).format(target.getTime()) + "'s Menu";
+    }
+
+    private static boolean isSameDay(Calendar c1, Calendar c2) {
+        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR)
+                && c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR);
     }
 
     private void renderMealContent() {
@@ -378,73 +460,38 @@ public class MealsLaundryFragment extends Fragment {
         int dayOfWeek = selectedCalendar.get(Calendar.DAY_OF_WEEK) - 1; // 0 = Sunday, 6 = Saturday
         boolean isWeekend = (dayOfWeek == 0 || dayOfWeek == 6);
 
-        int mealTitleRes;
-        int timingRes;
-        int iconRes;
-        String mealField;
-
-        switch (selectedMealIndex) {
-            case 0:
-                mealTitleRes = R.string.tab_breakfast;
-                timingRes = isWeekend ? R.string.breakfast_weekend_timings : R.string.breakfast_timings;
-                iconRes = R.drawable.ic_breakfast;
-                mealField = "breakfast";
-                break;
-            case 1:
-                mealTitleRes = R.string.tab_lunch;
-                timingRes = isWeekend ? R.string.lunch_weekend_timings : R.string.lunch_timings;
-                iconRes = R.drawable.ic_lunch;
-                mealField = "lunch";
-                break;
-            case 2:
-                mealTitleRes = R.string.tab_snacks;
-                timingRes = R.string.snacks_timings;
-                iconRes = R.drawable.ic_snacks;
-                mealField = "snacks";
-                break;
-            case 3:
-            default:
-                mealTitleRes = R.string.tab_dinner;
-                timingRes = R.string.dinner_timings;
-                iconRes = R.drawable.ic_dinner;
-                mealField = "dinner";
-                break;
+        if (textMealTitle != null) textMealTitle.setText(selectedMeal.titleRes);
+        if (textMealTiming != null) {
+            textMealTiming.setText(isWeekend ? selectedMeal.weekendTimingRes : selectedMeal.weekdayTimingRes);
         }
-
-        if (textMealTitle != null) textMealTitle.setText(mealTitleRes);
-        if (textMealTiming != null) textMealTiming.setText(timingRes);
-        if (imageMealIcon != null) imageMealIcon.setImageResource(iconRes);
+        if (imageMealIcon != null) imageMealIcon.setImageResource(selectedMeal.iconRes);
 
         if (layoutMealSpecialNotes != null && textMealSpecialNotes != null) {
-            if (selectedMealIndex == 1) {
+            if (selectedMeal.notesRes != 0) {
                 layoutMealSpecialNotes.setVisibility(View.VISIBLE);
-                textMealSpecialNotes.setText(R.string.lunch_notes);
-            } else if (selectedMealIndex == 3) {
-                layoutMealSpecialNotes.setVisibility(View.VISIBLE);
-                textMealSpecialNotes.setText(R.string.dinner_notes);
+                textMealSpecialNotes.setText(selectedMeal.notesRes);
             } else {
                 layoutMealSpecialNotes.setVisibility(View.GONE);
             }
         }
 
-        // Update status badge
-        Calendar todayCal = Calendar.getInstance();
-        boolean isSameDay = (todayCal.get(Calendar.YEAR) == selectedCalendar.get(Calendar.YEAR)
-                && todayCal.get(Calendar.DAY_OF_YEAR) == selectedCalendar.get(Calendar.DAY_OF_YEAR));
-
         if (textMealStatusBadge != null) {
-            if (isSameDay) {
-                textMealStatusBadge.setText("TODAY");
-            } else {
-                textMealStatusBadge.setText("SCHEDULE");
-            }
+            textMealStatusBadge.setText(isSameDay(Calendar.getInstance(), selectedCalendar) ? "TODAY" : "SCHEDULE");
         }
 
         if (layoutMealDishesContainer == null) return;
         layoutMealDishesContainer.removeAllViews();
-        float density = getResources().getDisplayMetrics().density;
 
-        String mealRaw = "";
+        String mealRaw = extractMealRaw(dayOfWeek);
+        if (mealRaw == null || mealRaw.trim().isEmpty() || mealRaw.equalsIgnoreCase("Not available")) {
+            renderEmptyState();
+            return;
+        }
+
+        renderDishesList(mealRaw);
+    }
+
+    private String extractMealRaw(int dayOfWeek) {
         try {
             if (hostelData != null && hostelData.has("meals")) {
                 JSONObject mealsObj = hostelData.getJSONObject("meals");
@@ -452,32 +499,32 @@ public class MealsLaundryFragment extends Fragment {
                     JSONObject menuObj = mealsObj.getJSONObject(currentMenuKey);
                     String dayKey = DAY_KEYS[dayOfWeek];
                     if (menuObj.has(dayKey)) {
-                        JSONObject dayObj = menuObj.getJSONObject(dayKey);
-                        mealRaw = dayObj.optString(mealField, "");
+                        return menuObj.getJSONObject(dayKey).optString(selectedMeal.key, "");
+                    } else if (menuObj.has(selectedMeal.key)) {
+                        // Direct single-day menu definition (e.g. special events)
+                        return menuObj.optString(selectedMeal.key, "");
                     }
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing meals data", e);
+            Log.e(TAG, "Error extracting meal data", e);
         }
+        return "";
+    }
 
-        if (mealRaw == null || mealRaw.trim().isEmpty() || mealRaw.equalsIgnoreCase("Not available")) {
-            View emptyView = getLayoutInflater().inflate(R.layout.layout_meal_empty_state, layoutMealDishesContainer, false);
-            View buttonImport = emptyView.findViewById(R.id.button_empty_import_ai);
-            if (buttonImport != null) {
-                buttonImport.setOnClickListener(v -> {
-                    HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
-                        loadHostelData();
-                        updateDayAndMenu();
-                        updateLaundryUI();
-                    });
-                });
-            }
-            layoutMealDishesContainer.addView(emptyView);
-            return;
+    private void renderEmptyState() {
+        View emptyView = getLayoutInflater().inflate(R.layout.layout_meal_empty_state, layoutMealDishesContainer, false);
+        View buttonImport = emptyView.findViewById(R.id.button_empty_import_ai);
+        if (buttonImport != null) {
+            buttonImport.setOnClickListener(v -> openCustomizerSheet());
         }
+        layoutMealDishesContainer.addView(emptyView);
+    }
 
+    private void renderDishesList(String mealRaw) {
+        float density = getResources().getDisplayMetrics().density;
         String[] items = mealRaw.split(",\\s*");
+
         for (int i = 0; i < items.length; i++) {
             String dishName = items[i].trim();
             if (dishName.isEmpty()) continue;
@@ -487,7 +534,6 @@ public class MealsLaundryFragment extends Fragment {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(0, (int) (6 * density), 0, (int) (6 * density));
 
-            // Dish bullet icon
             ImageView bulletIcon = new ImageView(getContext());
             LinearLayout.LayoutParams bulletParams = new LinearLayout.LayoutParams(
                     (int) (18 * density), (int) (18 * density)
@@ -497,12 +543,8 @@ public class MealsLaundryFragment extends Fragment {
             bulletIcon.setImageResource(R.drawable.ic_restaurant);
             bulletIcon.setImageTintList(ContextCompat.getColorStateList(requireContext(), R.color.secondary_75));
 
-            // Dish Name
             TextView dishText = new TextView(getContext());
-            LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
-            );
-            dishText.setLayoutParams(textParams);
+            dishText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f));
             dishText.setText(dishName);
             dishText.setTextSize(15);
             dishText.setTypeface(dishText.getTypeface(), Typeface.NORMAL);
@@ -510,22 +552,10 @@ public class MealsLaundryFragment extends Fragment {
             row.addView(bulletIcon);
             row.addView(dishText);
 
-            // Special item highlight tag
-            String lower = dishName.toLowerCase(Locale.ENGLISH);
-            String tagLabel = null;
-            if (lower.contains("chicken") || lower.contains("egg") || lower.contains("omelette") || lower.contains("fish")) {
-                tagLabel = "NON-VEG";
-            } else if (lower.contains("ice cream") || lower.contains("jamun") || lower.contains("halwa") || lower.contains("payasam") || lower.contains("cake")) {
-                tagLabel = "DESSERT";
-            } else if (lower.contains("shake") || lower.contains("lassi") || lower.contains("juice") || lower.contains("tea") || lower.contains("coffee") || lower.contains("milk")) {
-                tagLabel = "BEVERAGE";
-            } else if (lower.contains("biryani") || lower.contains("paneer") || lower.contains("dosa") || lower.contains("paratha") || lower.contains("poori")) {
-                tagLabel = "SPECIAL";
-            }
-
-            if (tagLabel != null) {
+            String tag = DishCategory.findTag(dishName);
+            if (tag != null) {
                 TextView tagView = new TextView(getContext());
-                tagView.setText(tagLabel);
+                tagView.setText(tag);
                 tagView.setTextSize(9);
                 tagView.setTypeface(tagView.getTypeface(), Typeface.BOLD);
                 tagView.setBackground(ContextCompat.getDrawable(requireContext(), R.drawable.background_pill_badge));
@@ -535,7 +565,6 @@ public class MealsLaundryFragment extends Fragment {
 
             layoutMealDishesContainer.addView(row);
 
-            // Hairline separator between dishes
             if (i < items.length - 1) {
                 View divider = new View(getContext());
                 LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
@@ -585,13 +614,7 @@ public class MealsLaundryFragment extends Fragment {
 
         View buttonAiImportLaundry = view.findViewById(R.id.button_ai_import_laundry);
         if (buttonAiImportLaundry != null) {
-            buttonAiImportLaundry.setOnClickListener(v -> {
-                HostelDataCustomizerBottomSheet.show(getParentFragmentManager(), () -> {
-                    loadHostelData();
-                    updateDayAndMenu();
-                    updateLaundryUI();
-                });
-            });
+            buttonAiImportLaundry.setOnClickListener(v -> openCustomizerSheet());
         }
 
         updateLaundryUI(savedRoom);
@@ -634,15 +657,13 @@ public class MealsLaundryFragment extends Fragment {
                 if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Tap 'AI Import' below to add circular");
                 return;
             }
-            Calendar cal = Calendar.getInstance();
 
+            Calendar cal = Calendar.getInstance();
             int foundDay = -1;
             int daysLeft = -1;
             String matchedSlot = "";
-
             Calendar followingCal = null;
 
-            // Search ahead up to 60 days to find both 1st (Next) and 2nd (Following) upcoming laundry drop-off dates
             for (int i = 0; i <= 60; i++) {
                 Calendar checkCal = (Calendar) cal.clone();
                 checkCal.add(Calendar.DAY_OF_MONTH, i);
@@ -668,44 +689,29 @@ public class MealsLaundryFragment extends Fragment {
                 if (textLaundrySlotRange != null) textLaundrySlotRange.setText("");
                 if (textLaundryFollowingDate != null) textLaundryFollowingDate.setText("Continuous 6-day cycle");
             } else {
-                String suffix = "th";
-                if (foundDay % 10 == 1 && foundDay != 11) suffix = "st";
-                else if (foundDay % 10 == 2 && foundDay != 12) suffix = "nd";
-                else if (foundDay % 10 == 3 && foundDay != 13) suffix = "rd";
-
+                String suffix = getDayNumberSuffix(foundDay);
                 Calendar targetCal = (Calendar) cal.clone();
                 targetCal.add(Calendar.DAY_OF_MONTH, daysLeft);
                 String monthName = targetCal.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.getDefault());
                 String dayOfWeek = targetCal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
 
                 textLaundryNextDate.setText(String.format(Locale.getDefault(), "%d%s %s", foundDay, suffix, monthName));
-                if (textLaundryDayName != null) {
-                    textLaundryDayName.setText(dayOfWeek);
-                }
+                if (textLaundryDayName != null) textLaundryDayName.setText(dayOfWeek);
 
                 if (textLaundryDaysLeft != null) {
-                    if (daysLeft == 0) {
-                        textLaundryDaysLeft.setText("Today!");
-                    } else if (daysLeft == 1) {
-                        textLaundryDaysLeft.setText("Tomorrow");
-                    } else {
-                        textLaundryDaysLeft.setText(String.format(Locale.getDefault(), "in %d days", daysLeft));
-                    }
+                    if (daysLeft == 0) textLaundryDaysLeft.setText("Today!");
+                    else if (daysLeft == 1) textLaundryDaysLeft.setText("Tomorrow");
+                    else textLaundryDaysLeft.setText(String.format(Locale.getDefault(), "in %d days", daysLeft));
                 }
 
                 if (textLaundrySlotRange != null) {
-                    String cleanSlot = matchedSlot.replace("-", "–").trim();
-                    textLaundrySlotRange.setText("Rooms: " + cleanSlot);
+                    textLaundrySlotRange.setText("Rooms: " + matchedSlot.replace("-", "–").trim());
                 }
 
                 if (textLaundryFollowingDate != null) {
                     if (followingCal != null) {
                         int fDay = followingCal.get(Calendar.DAY_OF_MONTH);
-                        String fSuffix = "th";
-                        if (fDay % 10 == 1 && fDay != 11) fSuffix = "st";
-                        else if (fDay % 10 == 2 && fDay != 12) fSuffix = "nd";
-                        else if (fDay % 10 == 3 && fDay != 13) fSuffix = "rd";
-
+                        String fSuffix = getDayNumberSuffix(fDay);
                         String fMonth = followingCal.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.getDefault());
                         String fDayOfWeek = followingCal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
                         textLaundryFollowingDate.setText(String.format(Locale.getDefault(), "%s, %d%s %s", fDayOfWeek, fDay, fSuffix, fMonth));
@@ -716,6 +722,16 @@ public class MealsLaundryFragment extends Fragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing laundry data", e);
+        }
+    }
+
+    private static String getDayNumberSuffix(int day) {
+        if (day >= 11 && day <= 13) return "th";
+        switch (day % 10) {
+            case 1: return "st";
+            case 2: return "nd";
+            case 3: return "rd";
+            default: return "th";
         }
     }
 
