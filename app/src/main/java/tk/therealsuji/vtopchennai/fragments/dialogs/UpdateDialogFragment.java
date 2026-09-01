@@ -45,6 +45,8 @@ import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
 
 public class UpdateDialogFragment extends DialogFragment {
 
+    private static final int REQUEST_CODE_INSTALL_PERMISSION = 7123;
+
     private String versionName;
     private String releaseNotes;
     private String downloadUrl;
@@ -60,6 +62,7 @@ public class UpdateDialogFragment extends DialogFragment {
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isDownloading = false;
+    private File pendingInstallApkFile = null;
 
     public UpdateDialogFragment() {
         // Required empty public constructor
@@ -114,9 +117,43 @@ public class UpdateDialogFragment extends DialogFragment {
             }
         });
 
-        buttonUpdate.setOnClickListener(view -> startDirectDownloadAndInstall());
+        // Check if APK already exists on disk
+        File existingApk = getApkTargetFile();
+        if (existingApk.exists() && existingApk.length() > 5 * 1024 * 1024) {
+            buttonUpdate.setText("Install Update");
+            if (layoutDownloadProgress != null) {
+                layoutDownloadProgress.setVisibility(View.VISIBLE);
+            }
+            if (progressBarDownload != null) {
+                progressBarDownload.setProgress(100);
+            }
+            if (textDownloadPercentage != null) {
+                textDownloadPercentage.setText("100%");
+            }
+            if (textDownloadBytes != null) {
+                double sizeMb = existingApk.length() / (1024.0 * 1024.0);
+                textDownloadBytes.setText(String.format(Locale.ENGLISH, "%.1f MB (Ready)", sizeMb));
+            }
+            if (textDownloadStatus != null) {
+                textDownloadStatus.setText("Update already downloaded and ready to install.");
+            }
+            buttonUpdate.setOnClickListener(view -> launchInstaller(existingApk));
+        } else {
+            buttonUpdate.setText("Update Now");
+            buttonUpdate.setOnClickListener(view -> startDirectDownloadAndInstall());
+        }
 
         return dialogFragment;
+    }
+
+    private File getApkTargetFile() {
+        Context context = requireContext();
+        File downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (downloadsDir == null) {
+            downloadsDir = context.getCacheDir();
+        }
+        String cleanVersion = versionName != null ? versionName.replace("/", "_") : "latest";
+        return new File(downloadsDir, "VTOP-" + cleanVersion + ".apk");
     }
 
     private void startDirectDownloadAndInstall() {
@@ -129,6 +166,9 @@ public class UpdateDialogFragment extends DialogFragment {
         if (layoutDownloadProgress != null) {
             layoutDownloadProgress.setVisibility(View.VISIBLE);
         }
+        if (textDownloadStatus != null) {
+            textDownloadStatus.setText("Connecting to server...");
+        }
 
         executorService.execute(() -> {
             Context context = getContext();
@@ -136,15 +176,11 @@ public class UpdateDialogFragment extends DialogFragment {
 
             String targetUrl = downloadUrl;
             if (targetUrl == null || targetUrl.isEmpty()) {
-                targetUrl = "https://github.com/shanmukhasaireddy13/Vtop-App/releases/download/" + versionName + "/app-debug.apk";
+                String tag = (versionName != null && versionName.startsWith("v")) ? versionName : "v" + versionName;
+                targetUrl = SettingsRepository.GITHUB_BASE_URL + "/releases/download/" + tag + "/app-debug.apk";
             }
 
-            File downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-            if (downloadsDir == null) {
-                downloadsDir = context.getCacheDir();
-            }
-            File apkFile = new File(downloadsDir, "VTOP-" + versionName + ".apk");
-
+            File apkFile = getApkTargetFile();
             HttpURLConnection connection = null;
             InputStream input = null;
             OutputStream output = null;
@@ -179,6 +215,9 @@ public class UpdateDialogFragment extends DialogFragment {
                             if (textDownloadBytes != null) {
                                 textDownloadBytes.setText(String.format(Locale.ENGLISH, "%.1f MB / %.1f MB", currentMB, totalMB));
                             }
+                            if (textDownloadStatus != null) {
+                                textDownloadStatus.setText("Downloading update...");
+                            }
                         });
                     }
                 }
@@ -197,6 +236,7 @@ public class UpdateDialogFragment extends DialogFragment {
 
             final boolean success = downloadSuccess;
             mainHandler.post(() -> {
+                isDownloading = false;
                 if (getContext() == null) return;
 
                 if (success && apkFile.exists() && apkFile.length() > 0) {
@@ -225,14 +265,32 @@ public class UpdateDialogFragment extends DialogFragment {
         if (context == null) return;
 
         try {
+            // Check unknown app sources permission on Android 8.0+ (API 26+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!context.getPackageManager().canRequestPackageInstalls()) {
-                    Toast.makeText(context, "Please allow VTOP to install updates", Toast.LENGTH_LONG).show();
+                    pendingInstallApkFile = apkFile;
+                    Toast.makeText(context, "Please allow VTOP to install updates, then return here", Toast.LENGTH_LONG).show();
+
+                    if (textDownloadStatus != null) {
+                        textDownloadStatus.setText("Permission required. Please enable 'Allow from this source', then return to VTOP.");
+                    }
+                    if (buttonUpdate != null) {
+                        buttonUpdate.setEnabled(true);
+                        buttonUpdate.setText("Install Update");
+                        buttonUpdate.setOnClickListener(v -> launchInstaller(apkFile));
+                    }
+                    if (buttonCancel != null) {
+                        buttonCancel.setEnabled(true);
+                    }
+
                     Intent permissionIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                             Uri.parse("package:" + context.getPackageName()));
-                    startActivity(permissionIntent);
+                    startActivityForResult(permissionIntent, REQUEST_CODE_INSTALL_PERMISSION);
+                    return; // STOP! Wait for user to grant permission and return.
                 }
             }
+
+            pendingInstallApkFile = null;
 
             Uri apkUri = FileProvider.getUriForFile(
                     context,
@@ -244,11 +302,44 @@ public class UpdateDialogFragment extends DialogFragment {
             installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
             installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            installIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             context.startActivity(installIntent);
             dismiss();
         } catch (Exception e) {
             Toast.makeText(context, "Error opening installer. Please install from Downloads folder.", Toast.LENGTH_LONG).show();
-            dismiss();
+            if (buttonUpdate != null) {
+                buttonUpdate.setEnabled(true);
+                buttonUpdate.setText("Retry Install");
+                buttonUpdate.setOnClickListener(v -> launchInstaller(apkFile));
+            }
+            if (buttonCancel != null) {
+                buttonCancel.setEnabled(true);
+            }
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        checkAndResumePendingInstall();
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_INSTALL_PERMISSION) {
+            checkAndResumePendingInstall();
+        }
+    }
+
+    private void checkAndResumePendingInstall() {
+        if (pendingInstallApkFile != null && pendingInstallApkFile.exists() && getContext() != null) {
+            Context context = getContext();
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.getPackageManager().canRequestPackageInstalls()) {
+                File apkFile = pendingInstallApkFile;
+                pendingInstallApkFile = null;
+                launchInstaller(apkFile);
+            }
         }
     }
 
