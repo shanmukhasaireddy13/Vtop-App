@@ -15,8 +15,14 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Base64;
 import android.view.ViewGroup;
+import android.net.http.SslError;
+import android.os.Build;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.SslErrorHandler;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
@@ -198,7 +204,7 @@ public class VTOPService extends Service {
                 if (canReuseSession) {
                     this.reloadPage("/content", false);
                 } else {
-                    this.reloadPage("/login", false);
+                    this.reloadPage("", false);
                 }
             }
         }
@@ -221,34 +227,58 @@ public class VTOPService extends Service {
 
         this.webView = new WebView(getApplicationContext());
         this.webView.addJavascriptInterface(this, "Android");
-        this.webView.getSettings().setJavaScriptEnabled(true);
-        this.webView.getSettings().setUserAgentString(authorisedUserAgent);
+        
+        WebSettings settings = this.webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+        if (authorisedUserAgent != null && !authorisedUserAgent.trim().isEmpty()) {
+            settings.setUserAgentString(authorisedUserAgent);
+        }
+        
         this.webView.setBackgroundColor(Color.TRANSPARENT);
         this.webView.setHorizontalScrollBarEnabled(false);
         this.webView.setVerticalScrollBarEnabled(false);
         this.webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                // Proceed on university certificate authority / captive portal SSL errors
+                handler.proceed();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 /*
                  *  JSON response format
                  *  {
-                 *      "page_type": "LANDING"|"HOME"|"LOGIN"
+                 *      "page_type": "LANDING"|"HOME"|"LOGIN"|"BODY_NOT_READY"
                  *  }
                  */
                 view.evaluateJavascript("(function() {" +
                         "try {" +
-                        "    if (!document || !document.body) {" +
+                        "    if (!document || !document.body || document.body.children.length === 0) {" +
                         "        return { page_type: 'BODY_NOT_READY' };" +
                         "    }" +
                         "    if (document.querySelector('input#authorizedIDX, input[name=\"authorizedID\"], #authorizedIDX')) {" +
                         "        return { page_type: 'HOME' };" +
                         "    }" +
-                        "    if (document.querySelector('form#vtopLoginForm, form[name=\"vtopLoginForm\"], #vtopLoginForm')) {" +
+                        "    if (document.querySelector('form#vtopLoginForm, form[name=\"vtopLoginForm\"], #vtopLoginForm, input[name=\"username\"], input[name=\"password\"], #captchaBlock, input[name=\"captchaStr\"]')) {" +
                         "        return { page_type: 'LOGIN' };" +
+                        "    }" +
+                        "    if (document.querySelector('#stdForm, form[name=\"stdForm\"], a[onclick*=\"submitForm\"], a[onclick*=\"stdForm\"], #student')) {" +
+                        "        return { page_type: 'LANDING' };" +
                         "    }" +
                         "    return { page_type: 'LANDING' };" +
                         "} catch(e) {" +
-                        "    return { page_type: 'LANDING' };" +
+                        "    return { page_type: 'BODY_NOT_READY' };" +
                         "}" +
                         "})();", responseString -> {
                     if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
@@ -314,9 +344,12 @@ public class VTOPService extends Service {
                     @Override
                     public void onNext(@NonNull JSONObject about) {
                         try {
-                            String authorisedUserAgent = about.getString("authorisedUserAgent");
+                            String defaultUA = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
+                            String authorisedUserAgent = about.optString("authorisedUserAgent", defaultUA);
                             sharedPreferences.edit().putString("authorisedUserAgent", authorisedUserAgent).apply();
-                            webView.getSettings().setUserAgentString(authorisedUserAgent);
+                            if (webView != null) {
+                                webView.getSettings().setUserAgentString(authorisedUserAgent);
+                            }
                         } catch (Exception ignored) {
                         }
                     }
@@ -327,7 +360,7 @@ public class VTOPService extends Service {
 
                     @Override
                     public void onComplete() {
-                        reloadPage("/login", true);
+                        reloadPage("", true);
                     }
                 });
     }
@@ -393,7 +426,17 @@ public class VTOPService extends Service {
             this.webView.clearHistory();
         }
 
-        this.webView.loadUrl(SettingsRepository.VTOP_BASE_URL + path);
+        String targetUrl = SettingsRepository.VTOP_BASE_URL;
+        if (path != null && !path.trim().isEmpty()) {
+            if (!targetUrl.endsWith("/") && !path.startsWith("/")) {
+                targetUrl += "/" + path;
+            } else if (targetUrl.endsWith("/") && path.startsWith("/")) {
+                targetUrl += path.substring(1);
+            } else {
+                targetUrl += path;
+            }
+        }
+        this.webView.loadUrl(targetUrl);
     }
 
     /**
@@ -417,7 +460,7 @@ public class VTOPService extends Service {
      */
     private void error(final int errorCode, final String errorMessage) {
         Toast.makeText(getApplicationContext(), "Error " + errorCode + ". " + errorMessage, Toast.LENGTH_SHORT).show();
-        this.reloadPage("/login", true);
+        this.reloadPage("", true);
 
         // Firebase Crashlytics Logging
         FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
@@ -435,22 +478,33 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "const response = {" +
-                "    success: false" +
-                "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url: '/vtop/prelogin/setup'," +
-                "    data: $('#stdForm').serialize()," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        response.success = true;" +
+                "try {" +
+                "    var form = document.getElementById('stdForm') || document.querySelector('#stdForm, form[action*=\"prelogin\"]');" +
+                "    if (form) {" +
+                "        if (typeof submitForm === 'function') {" +
+                "            submitForm('stdForm');" +
+                "        } else {" +
+                "            form.submit();" +
+                "        }" +
+                "        return { success: true, method: 'submit' };" +
                 "    }" +
-                "});" +
-                "return response;" +
+                "    var studentImg = document.getElementById('student') || document.querySelector('.cardStudent a, a[onclick*=\"stdForm\"]');" +
+                "    if (studentImg) {" +
+                "        studentImg.click();" +
+                "        return { success: true, method: 'click' };" +
+                "    }" +
+                "    return { success: false, error: 'Form not found' };" +
+                "} catch(e) {" +
+                "    return { success: false, error: e.toString() };" +
+                "}" +
                 "})();", responseString -> {
             try {
-                this.reloadPage("/login", false);
+                if (responseString != null && !responseString.equals("null")) {
+                    JSONObject res = new JSONObject(responseString);
+                    if (!res.optBoolean("success", false)) {
+                        this.reloadPage("", false);
+                    }
+                }
             } catch (Exception e) {
                 error(103, e.getLocalizedMessage());
             }
@@ -469,13 +523,15 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "const response = {" +
-                "    captcha_type: 'DEFAULT'" +
-                "};" +
-                "if ($('input[id=\"gResponse\"]').length === 1) {" +
-                "   response.captcha_type = 'GRECAPTCHA';" +
+                "try {" +
+                "    var gResp = document.querySelector('input[id=\"gResponse\"], input[name=\"gResponse\"], #gResponse, textarea[name=\"g-recaptcha-response\"]');" +
+                "    if (gResp) {" +
+                "        return { captcha_type: 'GRECAPTCHA' };" +
+                "    }" +
+                "    return { captcha_type: 'DEFAULT' };" +
+                "} catch(e) {" +
+                "    return { captcha_type: 'DEFAULT' };" +
                 "}" +
-                "return response;" +
                 "})();", responseString -> {
             try {
                 JSONObject response = new JSONObject(responseString);
@@ -506,21 +562,34 @@ public class VTOPService extends Service {
          *  }
          */
         this.webView.evaluateJavascript("(function() {" +
-                "return {" +
-                "   captcha: $('#captchaBlock img').get(0).src" +
-                "};" +
+                "try {" +
+                "    var img = document.querySelector('#captchaBlock img, img[src^=\"data:image\"], img[alt*=\"captcha\" i], #captchaimg, img[src*=\"captcha\" i]');" +
+                "    if (img && img.src) {" +
+                "        return { captcha: img.src };" +
+                "    }" +
+                "    if (typeof $ !== 'undefined' && $('#captchaBlock img').length) {" +
+                "        return { captcha: $('#captchaBlock img').get(0).src };" +
+                "    }" +
+                "    return { captcha: '' };" +
+                "} catch(e) {" +
+                "    return { captcha: '', error: e.toString() };" +
+                "}" +
                 "})();", responseString -> {
             try {
                 JSONObject response = new JSONObject(responseString);
+                String captchaVal = response.optString("captcha", "");
+                if (captchaVal.contains(",")) {
+                    String base64Captcha = captchaVal.split(",")[1];
+                    byte[] decodedString = Base64.decode(base64Captcha, Base64.DEFAULT);
+                    Bitmap decodedImage = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
 
-                String base64Captcha = response.getString("captcha").split(",")[1];
-                byte[] decodedString = Base64.decode(base64Captcha, Base64.DEFAULT);
-                Bitmap decodedImage = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
-
-                try {
-                    this.callback.onRequestCaptcha(CAPTCHA_DEFAULT, decodedImage, null);
-                } catch (Exception ignored) {
-                    this.endService(true);
+                    try {
+                        this.callback.onRequestCaptcha(CAPTCHA_DEFAULT, decodedImage, null);
+                    } catch (Exception ignored) {
+                        this.endService(true);
+                    }
+                } else {
+                    error(105, "Captcha image unavailable");
                 }
             } catch (Exception e) {
                 error(105, e.getLocalizedMessage());
@@ -586,54 +655,96 @@ public class VTOPService extends Service {
                      *      "error_code": 0
                      *  }
                      */
+                    String cleanU = username != null ? username.replaceAll("'", "\\\\'") : "";
+                    String cleanP = password != null ? password.replaceAll("'", "\\\\'") : "";
+                    String cleanC = captcha != null ? captcha.replaceAll("'", "\\\\'") : "";
+
                     webView.evaluateJavascript("(function() {" +
                             "if (typeof captchaInterval != 'undefined') clearInterval(captchaInterval);" +
                             "if (typeof executeInterval != 'undefined') clearInterval(executeInterval);" +
-                            "$('#vtopLoginForm [name=\"username\"]').val('" + username.replaceAll("'", "\\\\'") + "');" +
-                            "$('#vtopLoginForm [name=\"password\"]').val('" + password.replaceAll("'", "\\\\'") + "');" +
-                            "$('#vtopLoginForm [name=\"captchaStr\"]').val('" + captcha.replaceAll("'", "\\\\'") + "');" +
-                            "$('#vtopLoginForm [name=\"gResponse\"]').val('" + captcha.replaceAll("'", "\\\\'") + "');" +
+                            "var uInput = document.querySelector('#vtopLoginForm [name=\"username\"], input[name=\"username\"], input[name=\"uname\"]');" +
+                            "var pInput = document.querySelector('#vtopLoginForm [name=\"password\"], input[name=\"password\"], input[name=\"passwd\"]');" +
+                            "var cInput = document.querySelector('#vtopLoginForm [name=\"captchaStr\"], input[name=\"captchaStr\"], input[name=\"captcha\"]');" +
+                            "var gInput = document.querySelector('#vtopLoginForm [name=\"gResponse\"], input[name=\"gResponse\"], #gResponse');" +
+                            "if (uInput) uInput.value = '" + cleanU + "';" +
+                            "if (pInput) pInput.value = '" + cleanP + "';" +
+                            "if (cInput) cInput.value = '" + cleanC + "';" +
+                            "if (gInput) gInput.value = '" + cleanC + "';" +
+                            "if (typeof $ !== 'undefined') {" +
+                            "    $('#vtopLoginForm [name=\"username\"]').val('" + cleanU + "');" +
+                            "    $('#vtopLoginForm [name=\"password\"]').val('" + cleanP + "');" +
+                            "    $('#vtopLoginForm [name=\"captchaStr\"]').val('" + cleanC + "');" +
+                            "    $('#vtopLoginForm [name=\"gResponse\"]').val('" + cleanC + "');" +
+                            "}" +
                             "var response = {" +
                             "    authorised: false," +
                             "    error_message: null," +
                             "    error_code: 0" +
                             "};" +
-                            "$.ajax({" +
-                            "    type : 'POST'," +
-                            "    url : '/vtop/login'," +
-                            "    data : $('#vtopLoginForm').serialize()," +
-                            "    async: false," +
-                            "    success : function(res) {" +
-                            "        if(res.search('___INTERNAL___RESPONSE___') == -1) {" +
-                            "            $('#page_outline').html(res);" +
-                            "            if (res.includes('authorizedIDX')) {" +
-                            "                response.authorised = true;" +
-                            "                return;" +
-                            "            }" +
-                            "            var pageContent = res.toLowerCase();" +
-                            "            var invalidCaptchaRegex = new RegExp(/invalid\\s*captcha/);" +
-                            "            var invalidCredentialsRegex = new RegExp(/invalid\\s*(user\\s*name|login\\s*id|user\\s*id)\\s*\\/\\s*password/);" +
-                            "            var accountLockedRegex = new RegExp(/account\\s*is\\s*locked/);" +
-                            "            var maxFailAttemptsRegex = new RegExp(/maximum\\s*fail\\s*attempts\\s*reached/);" +
-                            "            if (invalidCaptchaRegex.test(pageContent)) {" +
-                            "                response.error_message = 'Invalid Captcha';" +
-                            "                response.error_code = 1;" +
-                            "            } else if(invalidCredentialsRegex.test(pageContent)) {" +
-                            "                response.error_message = 'Invalid Username / Password';" +
-                            "                response.error_code = 2;" +
-                            "            } else if(accountLockedRegex.test(pageContent)) {" +
-                            "                response.error_message = 'Your Account is Locked';" +
-                            "                response.error_code = 3;" +
-                            "            } else if(maxFailAttemptsRegex.test(pageContent)) {" +
-                            "                response.error_message = 'Maximum login attempts reached, open VTOP in your browser to reset your password';" +
-                            "                response.error_code = 4;" +
-                            "            } else {" +
-                            "                response.error_message = 'Unknown error';" +
-                            "                response.error_code = 5;" +
-                            "            }" +
+                            "var form = document.querySelector('#vtopLoginForm') || document.forms['vtopLoginForm'] || document.querySelector('form');" +
+                            "var formData = '';" +
+                            "if (form) {" +
+                            "    var elements = form.elements;" +
+                            "    var pairs = [];" +
+                            "    for (var i = 0; i < elements.length; i++) {" +
+                            "        var el = elements[i];" +
+                            "        if (el.name && !el.disabled && el.type !== 'submit' && el.type !== 'button') {" +
+                            "            pairs.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value));" +
                             "        }" +
                             "    }" +
-                            "});" +
+                            "    formData = pairs.join('&');" +
+                            "}" +
+                            "var resText = '';" +
+                            "if (typeof $ !== 'undefined' && $.ajax) {" +
+                            "    $.ajax({" +
+                            "        type : 'POST'," +
+                            "        url : '/vtop/login'," +
+                            "        data : ($('#vtopLoginForm').length ? $('#vtopLoginForm').serialize() : formData)," +
+                            "        async: false," +
+                            "        success : function(res) {" +
+                            "            resText = res;" +
+                            "        }" +
+                            "    });" +
+                            "} else {" +
+                            "    var xhr = new XMLHttpRequest();" +
+                            "    xhr.open('POST', '/vtop/login', false);" +
+                            "    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');" +
+                            "    xhr.send(formData);" +
+                            "    resText = xhr.responseText;" +
+                            "}" +
+                            "if (resText && resText.search('___INTERNAL___RESPONSE___') == -1) {" +
+                            "    var pageOutline = document.querySelector('#page_outline');" +
+                            "    if (pageOutline) {" +
+                            "        pageOutline.innerHTML = resText;" +
+                            "    } else if (typeof $ !== 'undefined') {" +
+                            "        $('#page_outline').html(resText);" +
+                            "    }" +
+                            "    if (resText.indexOf('authorizedIDX') !== -1) {" +
+                            "        response.authorised = true;" +
+                            "        return response;" +
+                            "    }" +
+                            "    var pageContent = resText.toLowerCase();" +
+                            "    var invalidCaptchaRegex = new RegExp(/invalid\\s*captcha/);" +
+                            "    var invalidCredentialsRegex = new RegExp(/invalid\\s*(user\\s*name|login\\s*id|user\\s*id)\\s*\\/\\s*password/);" +
+                            "    var accountLockedRegex = new RegExp(/account\\s*is\\s*locked/);" +
+                            "    var maxFailAttemptsRegex = new RegExp(/maximum\\s*fail\\s*attempts\\s*reached/);" +
+                            "    if (invalidCaptchaRegex.test(pageContent)) {" +
+                            "        response.error_message = 'Invalid Captcha';" +
+                            "        response.error_code = 1;" +
+                            "    } else if(invalidCredentialsRegex.test(pageContent)) {" +
+                            "        response.error_message = 'Invalid Username / Password';" +
+                            "        response.error_code = 2;" +
+                            "    } else if(accountLockedRegex.test(pageContent)) {" +
+                            "        response.error_message = 'Your Account is Locked';" +
+                            "        response.error_code = 3;" +
+                            "    } else if(maxFailAttemptsRegex.test(pageContent)) {" +
+                            "        response.error_message = 'Maximum login attempts reached, open VTOP in your browser to reset your password';" +
+                            "        response.error_code = 4;" +
+                            "    } else {" +
+                            "        response.error_message = 'Unknown error';" +
+                            "        response.error_code = 5;" +
+                            "    }" +
+                            "}" +
                             "return response;" +
                             "})();", responseString -> {
                         try {
@@ -648,7 +759,7 @@ public class VTOPService extends Service {
 
                                 int errorCode = response.getInt("error_code");
                                 if (errorCode == 1) {
-                                    this.reloadPage("/login", false);
+                                    this.reloadPage("", false);
                                 } else {
                                     if (errorCode == 2) {
                                         try {
