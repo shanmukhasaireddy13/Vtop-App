@@ -23,6 +23,7 @@ import java.util.List;
 
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
+import io.reactivex.rxjava3.core.MaybeObserver;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.core.SingleObserver;
@@ -243,7 +244,7 @@ public class PerformanceFragment extends Fragment {
                                 marksDao.getCumulativeMark(courseCode)
                                         .subscribeOn(Schedulers.single())
                                         .observeOn(AndroidSchedulers.mainThread())
-                                        .subscribe(new SingleObserver<CumulativeMark>() {
+                                        .subscribe(new MaybeObserver<CumulativeMark>() {
                                             @Override
                                             public void onSubscribe(@NonNull Disposable d) {
                                                 compositeDisposable.add(d);
@@ -286,7 +287,18 @@ public class PerformanceFragment extends Fragment {
 
                                             @Override
                                             public void onError(@NonNull Throwable e) {
-                                                Toast.makeText(getContext(), "Error: " + e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
+                                                overall.hide();
+                                                theory.hide();
+                                                project.hide();
+                                                lab.hide();
+                                            }
+
+                                            @Override
+                                            public void onComplete() {
+                                                overall.hide();
+                                                theory.hide();
+                                                project.hide();
+                                                lab.hide();
                                             }
                                         });
 

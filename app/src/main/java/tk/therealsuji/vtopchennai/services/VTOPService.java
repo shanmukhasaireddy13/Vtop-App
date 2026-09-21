@@ -236,21 +236,27 @@ public class VTOPService extends Service {
                  *  }
                  */
                 view.evaluateJavascript("(function() {" +
-                        "const response = {" +
-                        "   page_type: 'LANDING'" +
-                        "};" +
-                        "if (document.body === null) {" +
-                        "   response.page_type = 'BODY_NOT_READY';" +
-                        "} else if ($('input[id=\"authorizedIDX\"]').length === 1) {" +
-                        "   response.page_type = 'HOME';" +
-                        "} else if ($('form[id=\"vtopLoginForm\"]').length === 1) {" +
-                        "   response.page_type = 'LOGIN';" +
+                        "try {" +
+                        "    if (!document || !document.body) {" +
+                        "        return { page_type: 'BODY_NOT_READY' };" +
+                        "    }" +
+                        "    if (document.querySelector('input#authorizedIDX, input[name=\"authorizedID\"], #authorizedIDX')) {" +
+                        "        return { page_type: 'HOME' };" +
+                        "    }" +
+                        "    if (document.querySelector('form#vtopLoginForm, form[name=\"vtopLoginForm\"], #vtopLoginForm')) {" +
+                        "        return { page_type: 'LOGIN' };" +
+                        "    }" +
+                        "    return { page_type: 'LANDING' };" +
+                        "} catch(e) {" +
+                        "    return { page_type: 'LANDING' };" +
                         "}" +
-                        "return response;" +
                         "})();", responseString -> {
+                    if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                        return;
+                    }
                     try {
                         JSONObject response = new JSONObject(responseString);
-                        String pageType = response.getString("page_type");
+                        String pageType = response.optString("page_type", "LANDING");
 
                         switch (pageType) {
                             case "LANDING":
@@ -284,10 +290,9 @@ public class VTOPService extends Service {
                             case "BODY_NOT_READY":
                                 break;
                             default:
-                                throw new Error("Unknown page exception.");
+                                break;
                         }
-                    } catch (JSONException e) {
-                        Toast.makeText(VTOPService.this, "Error: " + e.getLocalizedMessage(), Toast.LENGTH_SHORT).show();
+                    } catch (Exception ignored) {
                     }
                 });
             }
@@ -685,35 +690,46 @@ public class VTOPService extends Service {
         webView.evaluateJavascript("(function() {" +
                 "var data = 'verifyMenu=true&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'academics/common/StudentTimeTableChn'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if (res.toLowerCase().includes('not authorized')) {" +
-                "            response.error_code = 1;" +
-                "            response.error_message = 'Unauthorised user agent';" +
-                "        } else if (res.toLowerCase().includes('time table')) {" +
-                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "            var options = doc.getElementById('semesterSubId').getElementsByTagName('option');" +
-                "            var semesters = [];" +
-                "            for(var i = 0; i < options.length; ++i) {" +
-                "                if(!options[i].value) {" +
-                "                    continue;" +
+                "try {" +
+                "    $.ajax({" +
+                "        type : 'POST'," +
+                "        url : 'academics/common/StudentTimeTableChn'," +
+                "        data : data," +
+                "        async: false," +
+                "        success : function(res) {" +
+                "            if (!res) return;" +
+                "            if (res.toLowerCase().includes('not authorized')) {" +
+                "                response.error_code = 1;" +
+                "                response.error_message = 'Unauthorised user agent';" +
+                "            } else if (res.toLowerCase().includes('time table')) {" +
+                "                var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "                var semSelect = doc.getElementById('semesterSubId');" +
+                "                if (!semSelect) return;" +
+                "                var options = semSelect.getElementsByTagName('option');" +
+                "                var semesters = [];" +
+                "                for(var i = 0; i < options.length; ++i) {" +
+                "                    if(!options[i].value) {" +
+                "                        continue;" +
+                "                    }" +
+                "                    var semester = {" +
+                "                        name: options[i].innerText," +
+                "                        id: options[i].value" +
+                "                    };" +
+                "                    semesters.push(semester);" +
                 "                }" +
-                "                var semester = {" +
-                "                    name: options[i].innerText," +
-                "                    id: options[i].value" +
-                "                };" +
-                "                semesters.push(semester);" +
+                "                response.semesters = semesters;" +
                 "            }" +
-                "            response.semesters = semesters;" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error_message = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
+            if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                error(201, "Empty response from server.");
+                return;
+            }
             try {
                 JSONObject response = new JSONObject(responseString);
 
@@ -725,12 +741,14 @@ public class VTOPService extends Service {
                     }
                 }
 
-                JSONArray semesterArray = response.getJSONArray("semesters");
+                JSONArray semesterArray = response.optJSONArray("semesters");
                 this.semesters = new HashMap<>();
 
-                for (int i = 0; i < semesterArray.length(); ++i) {
-                    JSONObject semesterObject = semesterArray.getJSONObject(i);
-                    this.semesters.put(semesterObject.getString("name"), semesterObject.getString("id"));
+                if (semesterArray != null) {
+                    for (int i = 0; i < semesterArray.length(); ++i) {
+                        JSONObject semesterObject = semesterArray.getJSONObject(i);
+                        this.semesters.put(semesterObject.getString("name"), semesterObject.getString("id"));
+                    }
                 }
 
                 try {
@@ -752,7 +770,9 @@ public class VTOPService extends Service {
      * Function to set the semester ID based on the semester selected.
      */
     public void setSemester(String semester) {
-        this.semesterID = this.semesters.get(semester);
+        if (this.semesters != null) {
+            this.semesterID = this.semesters.get(semester);
+        }
         getName();
     }
 
@@ -772,34 +792,43 @@ public class VTOPService extends Service {
         webView.evaluateJavascript("(function() {" +
                 "var data = 'verifyMenu=true&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'studentsRecord/StudentProfileAllView'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if(res.toLowerCase().includes('personal information')) {" +
-                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "            var cells = doc.getElementsByTagName('td');" +
-                "            for(var i = 0; i < cells.length; ++i) {" +
-                "                var key = cells[i].innerText.toLowerCase();" +
-                "                if(key.includes('student') && key.includes('name')) {" +
-                "                    response.name = cells[++i].innerHTML;" +
-                "                    break;" +
+                "try {" +
+                "    $.ajax({" +
+                "        type : 'POST'," +
+                "        url : 'studentsRecord/StudentProfileAllView'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if(res && res.toLowerCase().includes('personal information')) {" +
+                "                var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "                var cells = doc.getElementsByTagName('td');" +
+                "                for(var i = 0; i < cells.length; ++i) {" +
+                "                    var key = cells[i].innerText.toLowerCase();" +
+                "                    if(key.includes('student') && key.includes('name')) {" +
+                "                        if (i + 1 < cells.length) {" +
+                "                            response.name = cells[++i].innerHTML;" +
+                "                        }" +
+                "                        break;" +
+                "                    }" +
                 "                }" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error_message = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
-                JSONObject response = new JSONObject(responseString);
-                sharedPreferences.edit().putString("name", response.getString("name")).apply();
-
+                if (responseString != null && !responseString.equals("null") && !responseString.trim().isEmpty()) {
+                    JSONObject response = new JSONObject(responseString);
+                    if (response.has("name") && !response.isNull("name")) {
+                        sharedPreferences.edit().putString("name", response.optString("name", "")).apply();
+                    }
+                }
                 this.getCreditsCGPA();
             } catch (Exception e) {
-                error(301, e.getLocalizedMessage());
+                this.getCreditsCGPA();
             }
         });
     }
@@ -821,44 +850,62 @@ public class VTOPService extends Service {
         webView.evaluateJavascript("(function() {" +
                 "var data = 'verifyMenu=true&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'examinations/examGradeView/StudentGradeHistory'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var tables = doc.getElementsByTagName('table');" +
-                "        for (var i = tables.length - 1; i >= 0 ; --i) {" +
-                "            var headings = tables[i].getElementsByTagName('tr')[0].getElementsByTagName('td');" +
-                "            if (headings[0].innerText.toLowerCase().includes('credits')) {" +
-                "                var creditsIndex, cgpaIndex;" +
-                "                for (var j = 0; j < headings.length; ++j) {" +
-                "                    var heading = headings[j].innerText.toLowerCase();" +
-                "                    if (heading.includes('earned')) {" +
-                "                        creditsIndex = j + headings.length;" +
-                "                    } else if (heading.includes('cgpa')) {" +
-                "                        cgpaIndex = j + headings.length;" +
+                "try {" +
+                "    $.ajax({" +
+                "        type : 'POST'," +
+                "        url : 'examinations/examGradeView/StudentGradeHistory'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if (!res) return;" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var tables = doc.getElementsByTagName('table');" +
+                "            for (var i = tables.length - 1; i >= 0 ; --i) {" +
+                "                var rows = tables[i].getElementsByTagName('tr');" +
+                "                if (!rows || rows.length === 0) continue;" +
+                "                var headings = rows[0].getElementsByTagName('td');" +
+                "                if (!headings || headings.length === 0) headings = rows[0].getElementsByTagName('th');" +
+                "                if (!headings || headings.length === 0) continue;" +
+                "                if (headings[0].innerText.toLowerCase().includes('credits')) {" +
+                "                    var creditsIndex, cgpaIndex;" +
+                "                    for (var j = 0; j < headings.length; ++j) {" +
+                "                        var heading = headings[j].innerText.toLowerCase();" +
+                "                        if (heading.includes('earned')) {" +
+                "                            creditsIndex = j + headings.length;" +
+                "                        } else if (heading.includes('cgpa')) {" +
+                "                            cgpaIndex = j + headings.length;" +
+                "                        }" +
                 "                    }" +
+                "                    var cells = tables[i].getElementsByTagName('td');" +
+                "                    if (cgpaIndex !== undefined && cgpaIndex < cells.length) {" +
+                "                        response.cgpa = parseFloat(cells[cgpaIndex].innerText) || 0;" +
+                "                    }" +
+                "                    if (creditsIndex !== undefined && creditsIndex < cells.length) {" +
+                "                        response.total_credits = parseFloat(cells[creditsIndex].innerText) || 0;" +
+                "                    }" +
+                "                    break;" +
                 "                }" +
-                "                var cells = tables[i].getElementsByTagName('td');" +
-                "                response.cgpa = parseFloat(cells[cgpaIndex].innerText) || 0;" +
-                "                response.total_credits = parseFloat(cells[creditsIndex].innerText) || 0;" +
-                "                break;" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error_message = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
-                JSONObject response = new JSONObject(responseString);
-                this.sharedPreferences.edit().putFloat("cgpa", (float) response.getDouble("cgpa")).apply();
-                this.sharedPreferences.edit().putFloat("totalCredits", (float) response.getDouble("total_credits")).apply();
-
+                if (responseString != null && !responseString.equals("null") && !responseString.trim().isEmpty()) {
+                    JSONObject response = new JSONObject(responseString);
+                    if (response.has("cgpa") && !response.isNull("cgpa")) {
+                        this.sharedPreferences.edit().putFloat("cgpa", (float) response.optDouble("cgpa", 0.0)).apply();
+                    }
+                    if (response.has("total_credits") && !response.isNull("total_credits")) {
+                        this.sharedPreferences.edit().putFloat("totalCredits", (float) response.optDouble("total_credits", 0.0)).apply();
+                    }
+                }
                 this.downloadCourses();
             } catch (Exception e) {
-                error(302, e.getLocalizedMessage());
+                this.downloadCourses();
             }
         });
     }
@@ -895,62 +942,76 @@ public class VTOPService extends Service {
                 "var response = {" +
                 "    courses: []" +
                 "};" +
-                "$.ajax({" +
-                "    type : 'POST'," +
-                "    url : 'processViewTimeTable'," +
-                "    data : data," +
-                "    async: false," +
-                "    success : function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        if (!doc.getElementById('studentDetailsList')) {" +
-                "            return;" +
-                "        }" +
-                "        var table = doc.getElementById('studentDetailsList').getElementsByTagName('table')[0];" +
-                "        var headings = table.getElementsByTagName('th');" +
-                "        var courseIndex, creditsIndex, slotVenueIndex, facultyIndex;" +
-                "        for(var i = 0; i < headings.length; ++i) {" +
-                "            var heading = headings[i].innerText.toLowerCase();" +
-                "            if (heading == 'course') {" +
-                "                courseIndex = i;" +
-                "            } else if (heading == 'l t p j c') {" +
-                "                creditsIndex = i;" +
-                "            } else if (heading.includes('slot')) {" +
-                "                slotVenueIndex = i;" +
-                "            } else if (heading.includes('faculty')) {" +
-                "                facultyIndex = i;" +
+                "try {" +
+                "    $.ajax({" +
+                "        type : 'POST'," +
+                "        url : 'processViewTimeTable'," +
+                "        data : data," +
+                "        async: false," +
+                "        success : function(res) {" +
+                "            if (!res) return;" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var studentDetailsList = doc.getElementById('studentDetailsList');" +
+                "            if (!studentDetailsList) return;" +
+                "            var tables = studentDetailsList.getElementsByTagName('table');" +
+                "            if (!tables || tables.length === 0) return;" +
+                "            var table = tables[0];" +
+                "            var headings = table.getElementsByTagName('th');" +
+                "            if (!headings || headings.length === 0) return;" +
+                "            var courseIndex, creditsIndex, slotVenueIndex, facultyIndex;" +
+                "            for(var i = 0; i < headings.length; ++i) {" +
+                "                var heading = headings[i].innerText.toLowerCase();" +
+                "                if (heading == 'course') {" +
+                "                    courseIndex = i;" +
+                "                } else if (heading == 'l t p j c') {" +
+                "                    creditsIndex = i;" +
+                "                } else if (heading.includes('slot')) {" +
+                "                    slotVenueIndex = i;" +
+                "                } else if (heading.includes('faculty')) {" +
+                "                    facultyIndex = i;" +
+                "                }" +
+                "            }" +
+                "            var cells = table.getElementsByTagName('td');" +
+                "            if (!cells || cells.length === 0) return;" +
+                "            var headingOffset = (headings[0] && headings[0].innerText.toLowerCase().includes('invoice')) ? -1 : 0;" +
+                "            var cellOffset = (cells[0] && cells[0].innerText.toLowerCase().includes('invoice')) ? 1 : 0;" +
+                "            var offset = headingOffset + cellOffset;" +
+                "            while (courseIndex !== undefined && creditsIndex !== undefined && slotVenueIndex !== undefined && facultyIndex !== undefined &&" +
+                "                   courseIndex + offset < cells.length && creditsIndex + offset < cells.length && slotVenueIndex + offset < cells.length && facultyIndex + offset < cells.length) {" +
+                "                var course = {};" +
+                "                var rawCourse = cells[courseIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,' ');" +
+                "                var rawCourseType = rawCourse.split('(').slice(-1)[0].toLowerCase();" +
+                "                var rawCredits = cells[creditsIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,' ').trim().split(' ');" +
+                "                var rawSlotVenue = cells[slotVenueIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,'').split('-');" +
+                "                var rawFaculty = cells[facultyIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,'').split('-');" +
+                "                course.code = rawCourse.split('-')[0].trim();" +
+                "                course.title = rawCourse.split('-').slice(1).join('-').split('(')[0].trim();" +
+                "                course.type = (rawCourseType.includes('lab')) ? 'lab' : ((rawCourseType.includes('project')) ? 'project' : 'theory');" +
+                "                course.credits = parseInt(rawCredits[rawCredits.length - 1]) || 0;" +
+                "                course.slots = rawSlotVenue[0].trim().split('+');" +
+                "                course.venue = rawSlotVenue.slice(1, rawSlotVenue.length).join(' - ').trim();" +
+                "                course.faculty = rawFaculty[0].trim();" +
+                "                response.courses.push(course);" +
+                "                courseIndex += headings.length + headingOffset;" +
+                "                creditsIndex += headings.length + headingOffset;" +
+                "                slotVenueIndex += headings.length + headingOffset;" +
+                "                facultyIndex += headings.length + headingOffset;" +
                 "            }" +
                 "        }" +
-                "        var cells = table.getElementsByTagName('td');" +
-                "        var headingOffset = headings[0].innerText.toLowerCase().includes('invoice') ? -1 : 0;" +
-                "        var cellOffset = cells[0].innerText.toLowerCase().includes('invoice') ? 1 : 0;" +
-                "        var offset = headingOffset + cellOffset;" +
-                "        while (courseIndex < cells.length && creditsIndex < cells.length && slotVenueIndex < cells.length && facultyIndex < cells.length) {" +
-                "            var course = {};" +
-                "            var rawCourse = cells[courseIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,' ');" +
-                "            var rawCourseType = rawCourse.split('(').slice(-1)[0].toLowerCase();" +
-                "            var rawCredits = cells[creditsIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,' ').trim().split(' ');" +
-                "            var rawSlotVenue = cells[slotVenueIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,'').split('-');" +
-                "            var rawFaculty = cells[facultyIndex + offset].innerText.replace(/\\t/g,'').replace(/\\n/g,'').split('-');" +
-                "            course.code = rawCourse.split('-')[0].trim();" +
-                "            course.title = rawCourse.split('-').slice(1).join('-').split('(')[0].trim();" +
-                "            course.type = (rawCourseType.includes('lab')) ? 'lab' : ((rawCourseType.includes('project')) ? 'project' : 'theory');" +
-                "            course.credits = parseInt(rawCredits[rawCredits.length - 1]) || 0;" +
-                "            course.slots = rawSlotVenue[0].trim().split('+');" +
-                "            course.venue = rawSlotVenue.slice(1, rawSlotVenue.length).join(' - ').trim();" +
-                "            course.faculty = rawFaculty[0].trim();" +
-                "            response.courses.push(course);" +
-                "            courseIndex += headings.length + headingOffset;" +
-                "            creditsIndex += headings.length + headingOffset;" +
-                "            slotVenueIndex += headings.length + headingOffset;" +
-                "            facultyIndex += headings.length + headingOffset;" +
-                "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error_message = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
+            if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                error(401, "Empty response");
+                return;
+            }
             try {
                 JSONObject response = new JSONObject(responseString);
-                JSONArray courseArray = response.getJSONArray("courses");
+                JSONArray courseArray = response.optJSONArray("courses");
+                if (courseArray == null) courseArray = new JSONArray();
 
                 List<Course> courses = new ArrayList<>();
                 List<Slot> slots = new ArrayList<>();
@@ -971,6 +1032,7 @@ public class VTOPService extends Service {
                     course.code = this.getStringValue(courseObject, "code");
                     course.title = this.getStringValue(courseObject, "title");
                     course.type = this.getStringValue(courseObject, "type");
+                    if (course.type == null) course.type = "theory";
                     course.credits = this.getIntegerValue(courseObject, "credits");
                     course.venue = this.getStringValue(courseObject, "venue");
                     course.faculty = this.getStringValue(courseObject, "faculty");
@@ -990,16 +1052,18 @@ public class VTOPService extends Service {
                         this.theoryCourses.put(course.id, course);
                     }
 
-                    JSONArray slotsArray = courseObject.getJSONArray("slots");
-                    for (int j = 0; j < slotsArray.length(); ++j, ++slotId) {
-                        Slot slot = new Slot();
+                    JSONArray slotsArray = courseObject.optJSONArray("slots");
+                    if (slotsArray != null) {
+                        for (int j = 0; j < slotsArray.length(); ++j, ++slotId) {
+                            Slot slot = new Slot();
 
-                        slot.id = slotId;
-                        slot.slot = slotsArray.getString(j);
-                        slot.courseId = course.id;
+                            slot.id = slotId;
+                            slot.slot = slotsArray.getString(j);
+                            slot.courseId = course.id;
 
-                        slots.add(slot);
-                        slotReference.put(slot.slot, slot);
+                            slots.add(slot);
+                            slotReference.put(slot.slot, slot);
+                        }
                     }
                 }
 
@@ -1075,77 +1139,101 @@ public class VTOPService extends Service {
                 "    lab: []," +
                 "    theory: []" +
                 "};" +
-                "$.ajax({" +
-                "    type : 'POST'," +
-                "    url : 'processViewTimeTable'," +
-                "    data : data," +
-                "    async: false," +
-                "    success : function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var spans = doc.getElementById('getStudentDetails').getElementsByTagName('span');" +
-                "        if(spans[0].innerText.toLowerCase().includes('no record(s) found')) {" +
-                "           return;" +
-                "        }" +
-                "        var cells = doc.getElementById('timeTableStyle').getElementsByTagName('td');" +
-                "        var key, type;" +
-                "        for (var i = 0, j = 0; i < cells.length; ++i) {" +
-                "            var content = cells[i].innerText.toUpperCase();" +
-                "            if (content.includes('THEORY')) {" +
-                "                type = 'theory';" +
-                "                j = 0;" +
-                "                continue;" +
-                "            } else if (content.includes('LAB')) {" +
-                "                type = 'lab';" +
-                "                j = 0;" +
-                "                continue;" +
-                "            } else if (content.includes('START')) {" +
-                "                key = 'start';" +
-                "                continue;" +
-                "            } else if (content.includes('END')) {" +
-                "                key = 'end';" +
-                "                continue;" +
-                "            } else if (content.includes('SUN')) {" +
-                "                key = 'sunday';" +
-                "                continue;" +
-                "            } else if (content.includes('MON')) {" +
-                "                key = 'monday';" +
-                "                continue;" +
-                "            } else if (content.includes('TUE')) {" +
-                "                key = 'tuesday';" +
-                "                continue;" +
-                "            } else if (content.includes('WED')) {" +
-                "                key = 'wednesday';" +
-                "                continue;" +
-                "            } else if (content.includes('THU')) {" +
-                "                key = 'thursday';" +
-                "                continue;" +
-                "            } else if (content.includes('FRI')) {" +
-                "                key = 'friday';" +
-                "                continue;" +
-                "            } else if (content.includes('SAT')) {" +
-                "                key = 'saturday';" +
-                "                continue;" +
-                "            } else if (content.includes('LUNCH')) {" +
-                "                continue;" +
+                "try {" +
+                "    $.ajax({" +
+                "        type : 'POST'," +
+                "        url : 'processViewTimeTable'," +
+                "        data : data," +
+                "        async: false," +
+                "        success : function(res) {" +
+                "            if (!res) return;" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var studentDetails = doc.getElementById('getStudentDetails');" +
+                "            if (studentDetails) {" +
+                "                var spans = studentDetails.getElementsByTagName('span');" +
+                "                if(spans.length > 0 && spans[0].innerText.toLowerCase().includes('no record(s) found')) {" +
+                "                   return;" +
+                "                }" +
                 "            }" +
-                "            if (key == 'start') {" +
-                "                response[type].push({ start_time: content.trim() });" +
-                "            } else if (key == 'end') {" +
-                "                response[type][j++].end_time = content.trim();" +
-                "            } else if (content.split('-').length > 1) {" +
-                "                response[type][j++][key] = content.split('-')[0].trim();" +
-                "            } else {" +
-                "                response[type][j++][key] = null;" +
+                "            var timeTableStyle = doc.getElementById('timeTableStyle');" +
+                "            if (!timeTableStyle) return;" +
+                "            var cells = timeTableStyle.getElementsByTagName('td');" +
+                "            if (!cells || cells.length === 0) return;" +
+                "            var key, type;" +
+                "            for (var i = 0, j = 0; i < cells.length; ++i) {" +
+                "                var content = cells[i].innerText.toUpperCase();" +
+                "                if (content.includes('THEORY')) {" +
+                "                    type = 'theory';" +
+                "                    j = 0;" +
+                "                    continue;" +
+                "                } else if (content.includes('LAB')) {" +
+                "                    type = 'lab';" +
+                "                    j = 0;" +
+                "                    continue;" +
+                "                } else if (content.includes('START')) {" +
+                "                    key = 'start';" +
+                "                    continue;" +
+                "                } else if (content.includes('END')) {" +
+                "                    key = 'end';" +
+                "                    continue;" +
+                "                } else if (content.includes('SUN')) {" +
+                "                    key = 'sunday';" +
+                "                    continue;" +
+                "                } else if (content.includes('MON')) {" +
+                "                    key = 'monday';" +
+                "                    continue;" +
+                "                } else if (content.includes('TUE')) {" +
+                "                    key = 'tuesday';" +
+                "                    continue;" +
+                "                } else if (content.includes('WED')) {" +
+                "                    key = 'wednesday';" +
+                "                    continue;" +
+                "                } else if (content.includes('THU')) {" +
+                "                    key = 'thursday';" +
+                "                    continue;" +
+                "                } else if (content.includes('FRI')) {" +
+                "                    key = 'friday';" +
+                "                    continue;" +
+                "                } else if (content.includes('SAT')) {" +
+                "                    key = 'saturday';" +
+                "                    continue;" +
+                "                } else if (content.includes('LUNCH')) {" +
+                "                    continue;" +
+                "                }" +
+                "                if (key == 'start') {" +
+                "                    response[type].push({ start_time: content.trim() });" +
+                "                } else if (key == 'end') {" +
+                "                    if (response[type] && j < response[type].length) {" +
+                "                        response[type][j++].end_time = content.trim();" +
+                "                    }" +
+                "                } else if (content.split('-').length > 1) {" +
+                "                    if (response[type] && j < response[type].length) {" +
+                "                        response[type][j++][key] = content.split('-')[0].trim();" +
+                "                    }" +
+                "                } else {" +
+                "                    if (response[type] && j < response[type].length) {" +
+                "                        response[type][j++][key] = null;" +
+                "                    }" +
+                "                }" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error_message = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
+            if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                error(501, "Empty response");
+                onStreamComplete("Timetable");
+                return;
+            }
             try {
                 JSONObject response = new JSONObject(responseString);
-                JSONArray labArray = response.getJSONArray("lab");
-                JSONArray theoryArray = response.getJSONArray("theory");
+                JSONArray labArray = response.optJSONArray("lab");
+                JSONArray theoryArray = response.optJSONArray("theory");
+                if (labArray == null) labArray = new JSONArray();
+                if (theoryArray == null) theoryArray = new JSONArray();
 
                 SettingsRepository.clearNotificationPendingIntents(this.getApplicationContext());
 
@@ -1197,13 +1285,15 @@ public class VTOPService extends Service {
                     String[] timings = {lab.startTime, lab.endTime, theory.startTime, theory.endTime};
                     for (int j = 0; j < timings.length; ++j) {
                         try {
-                            Date time = hour24.parse(timings[j]);
-                            Date hourStart = hour24.parse("08:00");
+                            if (timings[j] != null) {
+                                Date time = hour24.parse(timings[j]);
+                                Date hourStart = hour24.parse("08:00");
 
-                            if (time != null && time.before(hourStart)) {
-                                time = hour12.parse(timings[j] + " PM");
-                                if (time != null) {
-                                    timings[j] = hour24.format(time);
+                                if (time != null && hourStart != null && time.before(hourStart)) {
+                                    time = hour12.parse(timings[j] + " PM");
+                                    if (time != null) {
+                                        timings[j] = hour24.format(time);
+                                    }
                                 }
                             }
                         } catch (Exception ignored) {
@@ -1281,8 +1371,10 @@ public class VTOPService extends Service {
                 "    attendance: []" +
                 "};" +
                 "try {" +
-                "    var csrf = $('input[name=\"_csrf\"]').val();" +
-                "    var authId = $('#authorizedIDX').val() || '';" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
                 "    var semesterSubId = '" + semesterID + "';" +
                 "    $.ajax({" +
                 "        type : 'POST'," +
@@ -1295,9 +1387,10 @@ public class VTOPService extends Service {
                 "                var table = doc.getElementById('getStudentDetails') || doc.getElementsByTagName('table')[0];" +
                 "                if (!table) return;" +
                 "                var headings = table.getElementsByTagName('th');" +
+                "                if (!headings || headings.length === 0) headings = table.getElementsByTagName('td');" +
                 "                var courseTypeIndex = -1, slotIndex = -1, attendedIndex = -1, totalIndex = -1, percentageIndex = -1;" +
                 "                for (var i = 0; i < headings.length; ++i) {" +
-                "                    var heading = headings[i].innerText.toLowerCase();" +
+                "                    var heading = (headings[i].innerText || '').toLowerCase();" +
                 "                    if (heading.includes('course') && heading.includes('type')) {" +
                 "                        courseTypeIndex = i;" +
                 "                    } else if (heading.includes('slot')) {" +
@@ -1314,11 +1407,11 @@ public class VTOPService extends Service {
                 "                for (var r = 1; r < rows.length; r++) {" +
                 "                    try {" +
                 "                        var rowCells = rows[r].getElementsByTagName('td');" +
-                "                        if (rowCells.length > Math.max(courseTypeIndex, slotIndex)) {" +
-                "                            var courseTypeText = rowCells[courseTypeIndex].innerText.trim();" +
-                "                            var slotText = rowCells[slotIndex].innerText.trim().split('+')[0].trim();" +
-                "                            var attendedRaw = attendedIndex !== -1 ? parseInt(rowCells[attendedIndex].innerText.trim()) : NaN;" +
-                "                            var totalRaw = totalIndex !== -1 ? parseInt(rowCells[totalIndex].innerText.trim()) : NaN;" +
+                "                        if (rowCells.length > Math.max(courseTypeIndex, slotIndex) && slotIndex >= 0) {" +
+                "                            var courseTypeText = courseTypeIndex >= 0 ? (rowCells[courseTypeIndex].innerText || '').trim() : '';" +
+                "                            var slotText = (rowCells[slotIndex].innerText || '').trim().split('+')[0].trim();" +
+                "                            var attendedRaw = attendedIndex >= 0 ? parseInt(rowCells[attendedIndex].innerText.trim()) : NaN;" +
+                "                            var totalRaw = totalIndex >= 0 ? parseInt(rowCells[totalIndex].innerText.trim()) : NaN;" +
                 "                            var attended = isNaN(attendedRaw) ? null : attendedRaw;" +
                 "                            var total = isNaN(totalRaw) ? null : totalRaw;" +
                 "                            var percentage = (attended !== null && total !== null && total > 0) ? Math.ceil((attended * 100) / total) : 0;" +
@@ -1342,7 +1435,7 @@ public class VTOPService extends Service {
                 "                                                    var detailHeadings = detailTable.getElementsByTagName('th');" +
                 "                                                    var dateIndex = -1, detailSlotIndex = -1, timingIndex = -1, statusIndex = -1;" +
                 "                                                    for (var h = 0; h < detailHeadings.length; h++) {" +
-                "                                                        var hText = detailHeadings[h].innerText.toLowerCase();" +
+                "                                                        var hText = (detailHeadings[h].innerText || '').toLowerCase();" +
                 "                                                        if (hText.includes('date')) {" +
                 "                                                            dateIndex = h;" +
                 "                                                        } else if (hText.includes('slot')) {" +
@@ -1359,10 +1452,10 @@ public class VTOPService extends Service {
                 "                                                    for (var dr = 1; dr < detailRows.length; dr++) {" +
                 "                                                        var drCells = detailRows[dr].getElementsByTagName('td');" +
                 "                                                        if (drCells.length > 0) {" +
-                "                                                            var logDate = (dateIndex >= 0 && dateIndex < drCells.length) ? drCells[dateIndex].innerText.trim() : '';" +
-                "                                                            var logSlot = (detailSlotIndex >= 0 && detailSlotIndex < drCells.length) ? drCells[detailSlotIndex].innerText.trim() : '';" +
-                "                                                            var logTiming = (timingIndex >= 0 && timingIndex < drCells.length) ? drCells[timingIndex].innerText.trim() : '';" +
-                "                                                            var logStatus = (statusIndex >= 0 && statusIndex < drCells.length) ? drCells[statusIndex].innerText.trim() : '';" +
+                "                                                            var logDate = (dateIndex >= 0 && dateIndex < drCells.length) ? (drCells[dateIndex].innerText || '').trim() : '';" +
+                "                                                            var logSlot = (detailSlotIndex >= 0 && detailSlotIndex < drCells.length) ? (drCells[detailSlotIndex].innerText || '').trim() : '';" +
+                "                                                            var logTiming = (timingIndex >= 0 && timingIndex < drCells.length) ? (drCells[timingIndex].innerText || '').trim() : '';" +
+                "                                                            var logStatus = (statusIndex >= 0 && statusIndex < drCells.length) ? (drCells[statusIndex].innerText || '').trim() : '';" +
                 "                                                            var statusText = logStatus.toLowerCase();" +
                 "                                                            if (!logDate || !logStatus || statusText.includes('no attendance') || statusText.includes('not posted')) {" +
                 "                                                                continue;" +
@@ -1417,8 +1510,15 @@ public class VTOPService extends Service {
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    onStreamComplete("Attendance");
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray attendanceArray = response.getJSONArray("attendance");
+                JSONArray attendanceArray = response.optJSONArray("attendance");
+                if (attendanceArray == null) {
+                    attendanceArray = new JSONArray();
+                }
                 List<Attendance> attendance = new ArrayList<>();
 
                 int attendedClasses = 0;
@@ -1430,17 +1530,21 @@ public class VTOPService extends Service {
 
                     int courseType = Course.TYPE_THEORY;
 
-                    if (attendanceObject.getString("course_type").toLowerCase().contains("lab")) {
+                    String rawCourseType = attendanceObject.optString("course_type", "");
+                    if (rawCourseType.toLowerCase().contains("lab")) {
                         courseType = Course.TYPE_LAB;
                     }
 
+                    String slot = attendanceObject.optString("slot", "");
                     attendanceItem.id = i + 1;
-                    attendanceItem.courseId = this.getCourseId(attendanceObject.getString("slot"), courseType);
+                    attendanceItem.courseId = this.getCourseId(slot, courseType);
                     attendanceItem.attended = this.getIntegerValue(attendanceObject, "attended");
                     attendanceItem.total = this.getIntegerValue(attendanceObject, "total");
 
-                    if (attendanceObject.has("details")) {
-                        attendanceItem.details = attendanceObject.getJSONArray("details").toString();
+                    if (attendanceObject.has("details") && !attendanceObject.isNull("details")) {
+                        attendanceItem.details = attendanceObject.optJSONArray("details") != null
+                                ? attendanceObject.optJSONArray("details").toString()
+                                : "[]";
                     } else {
                         attendanceItem.details = "[]";
                     }
@@ -1523,88 +1627,114 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + $('#authorizedIDX').val()  + '&_csrf=' + $('input[name=\"_csrf\"]').val();" +
                 "var response = {" +
                 "    marks: []" +
                 "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'examinations/doStudentMarkView'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if(res.toLowerCase().includes('no data found')) {" +
-                "            return;" +
-                "        }" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var table = doc.getElementById('fixedTableContainer');" +
-                "        var rows = table.getElementsByTagName('tr');" +
-                "        var headings = rows[0].getElementsByTagName('td');" +
-                "        var courseTypeIndex, slotIndex;" +
-                "        for (var i = 0; i < headings.length; ++i) {" +
-                "            var heading = headings[i].innerText.toLowerCase();" +
-                "            if (heading.includes('course') && heading.includes('type')) {" +
-                "                courseTypeIndex = i;" +
-                "            } else if (heading.includes('slot')) {" +
-                "                slotIndex = i;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + authId + '&_csrf=' + csrf;" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'examinations/doStudentMarkView'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if (!res || res.toLowerCase().includes('no data found')) {" +
+                "                return;" +
                 "            }" +
-                "        }" +
-                "        for (var i = 1; i < rows.length; ++i) {" +
-                "            var rawCourseType = rows[i].getElementsByTagName('td')[courseTypeIndex].innerText.trim().toLowerCase();" +
-                "            var courseType = (rawCourseType.includes('lab')) ? 'lab' : ((rawCourseType.includes('project')) ? 'project' : 'theory');" +
-                "            var slot = rows[i++].getElementsByTagName('td')[slotIndex].innerText.split('+')[0].trim();" +
-                "            var innerTable = rows[i].getElementsByTagName('table')[0];" +
-                "            var innerRows = innerTable.getElementsByTagName('tr');" +
-                "            var innerHeadings = innerRows[0].getElementsByTagName('td');" +
-                "            var titleIndex, scoreIndex, maxScoreIndex, weightageIndex, maxWeightageIndex, averageIndex, statusIndex;" +
-                "            for (var j = 0; j < innerHeadings.length; ++j) {" +
-                "                var innerHeading = innerHeadings[j].innerText.toLowerCase();" +
-                "                if (innerHeading.includes('title')) {" +
-                "                    titleIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('max')) {" +
-                "                    maxScoreIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('%')) {" +
-                "                    maxWeightageIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('status')) {" +
-                "                    statusIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('scored')) {" +
-                "                    scoreIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('weightage') && innerHeading.includes('mark')) {" +
-                "                    weightageIndex = j + innerHeadings.length;" +
-                "                } else if (innerHeading.includes('average')) {" +
-                "                    averageIndex = j + innerHeadings.length;" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var table = doc.getElementById('fixedTableContainer') || doc.getElementsByTagName('table')[0];" +
+                "            if (!table) return;" +
+                "            var rows = table.getElementsByTagName('tr');" +
+                "            if (!rows || rows.length === 0) return;" +
+                "            var headings = rows[0].getElementsByTagName('td');" +
+                "            if (!headings || headings.length === 0) headings = rows[0].getElementsByTagName('th');" +
+                "            if (!headings || headings.length === 0) return;" +
+                "            var courseTypeIndex = -1, slotIndex = -1;" +
+                "            for (var i = 0; i < headings.length; ++i) {" +
+                "                var heading = (headings[i].innerText || '').toLowerCase();" +
+                "                if (heading.includes('course') && heading.includes('type')) {" +
+                "                    courseTypeIndex = i;" +
+                "                } else if (heading.includes('slot')) {" +
+                "                    slotIndex = i;" +
                 "                }" +
                 "            }" +
-                "            var innerCells = innerTable.getElementsByTagName('td');" +
-                "            while(titleIndex < innerCells.length && scoreIndex < innerCells.length && maxScoreIndex < innerCells.length && weightageIndex < innerCells.length && maxWeightageIndex < innerCells.length && averageIndex < innerCells.length && statusIndex < innerCells.length) {" +
-                "                var mark = {};" +
-                "                mark.slot = slot;" +
-                "                mark.course_type = courseType;" +
-                "                mark.title = innerCells[titleIndex].innerText.trim();" +
-                "                mark.score = parseFloat(innerCells[scoreIndex].innerText) || 0;" +
-                "                mark.max_score = parseFloat(innerCells[maxScoreIndex].innerText) || null;" +
-                "                mark.weightage = parseFloat(innerCells[weightageIndex].innerText) || 0;" +
-                "                mark.max_weightage = parseFloat(innerCells[maxWeightageIndex].innerText) || null;" +
-                "                mark.average = parseFloat(innerCells[averageIndex].innerText) || null;" +
-                "                mark.status = innerCells[statusIndex].innerText.trim();" +
-                "                response.marks.push(mark);" +
-                "                titleIndex += innerHeadings.length;" +
-                "                scoreIndex += innerHeadings.length;" +
-                "                maxScoreIndex += innerHeadings.length;" +
-                "                weightageIndex += innerHeadings.length;" +
-                "                maxWeightageIndex += innerHeadings.length;" +
-                "                averageIndex += innerHeadings.length;" +
-                "                statusIndex += innerHeadings.length;" +
+                "            for (var i = 1; i < rows.length; ++i) {" +
+                "                var rowCells = rows[i].getElementsByTagName('td');" +
+                "                if (!rowCells || rowCells.length <= Math.max(courseTypeIndex, slotIndex)) continue;" +
+                "                var rawCourseType = courseTypeIndex >= 0 ? (rowCells[courseTypeIndex].innerText || '').trim().toLowerCase() : '';" +
+                "                var courseType = (rawCourseType.includes('lab')) ? 'lab' : ((rawCourseType.includes('project')) ? 'project' : 'theory');" +
+                "                var slot = slotIndex >= 0 ? (rowCells[slotIndex].innerText || '').split('+')[0].trim() : '';" +
+                "                var nextRow = rows[++i];" +
+                "                if (!nextRow) break;" +
+                "                var innerTable = nextRow.getElementsByTagName('table')[0];" +
+                "                if (!innerTable) continue;" +
+                "                var innerRows = innerTable.getElementsByTagName('tr');" +
+                "                if (!innerRows || innerRows.length === 0) continue;" +
+                "                var innerHeadings = innerRows[0].getElementsByTagName('td');" +
+                "                if (!innerHeadings || innerHeadings.length === 0) innerHeadings = innerRows[0].getElementsByTagName('th');" +
+                "                if (!innerHeadings || innerHeadings.length === 0) continue;" +
+                "                var titleIndex = -1, scoreIndex = -1, maxScoreIndex = -1, weightageIndex = -1, maxWeightageIndex = -1, averageIndex = -1, statusIndex = -1;" +
+                "                for (var j = 0; j < innerHeadings.length; ++j) {" +
+                "                    var innerHeading = (innerHeadings[j].innerText || '').toLowerCase();" +
+                "                    if (innerHeading.includes('title')) {" +
+                "                        titleIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('max')) {" +
+                "                        maxScoreIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('%')) {" +
+                "                        maxWeightageIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('status')) {" +
+                "                        statusIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('scored')) {" +
+                "                        scoreIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('weightage') && innerHeading.includes('mark')) {" +
+                "                        weightageIndex = j + innerHeadings.length;" +
+                "                    } else if (innerHeading.includes('average')) {" +
+                "                        averageIndex = j + innerHeadings.length;" +
+                "                    }" +
+                "                }" +
+                "                var innerCells = innerTable.getElementsByTagName('td');" +
+                "                while(titleIndex >= 0 && titleIndex < innerCells.length && scoreIndex >= 0 && scoreIndex < innerCells.length && maxScoreIndex >= 0 && maxScoreIndex < innerCells.length && weightageIndex >= 0 && weightageIndex < innerCells.length && maxWeightageIndex >= 0 && maxWeightageIndex < innerCells.length && averageIndex >= 0 && averageIndex < innerCells.length && statusIndex >= 0 && statusIndex < innerCells.length) {" +
+                "                    var mark = {};" +
+                "                    mark.slot = slot;" +
+                "                    mark.course_type = courseType;" +
+                "                    mark.title = (innerCells[titleIndex].innerText || '').trim();" +
+                "                    mark.score = parseFloat(innerCells[scoreIndex].innerText) || 0;" +
+                "                    mark.max_score = parseFloat(innerCells[maxScoreIndex].innerText) || null;" +
+                "                    mark.weightage = parseFloat(innerCells[weightageIndex].innerText) || 0;" +
+                "                    mark.max_weightage = parseFloat(innerCells[maxWeightageIndex].innerText) || null;" +
+                "                    mark.average = parseFloat(innerCells[averageIndex].innerText) || null;" +
+                "                    mark.status = (innerCells[statusIndex].innerText || '').trim();" +
+                "                    response.marks.push(mark);" +
+                "                    titleIndex += innerHeadings.length;" +
+                "                    scoreIndex += innerHeadings.length;" +
+                "                    maxScoreIndex += innerHeadings.length;" +
+                "                    weightageIndex += innerHeadings.length;" +
+                "                    maxWeightageIndex += innerHeadings.length;" +
+                "                    averageIndex += innerHeadings.length;" +
+                "                    statusIndex += innerHeadings.length;" +
+                "                }" +
                 "            }" +
-                "            i += innerRows.length;" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    downloadGrades();
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray marksArray = response.getJSONArray("marks");
+                JSONArray marksArray = response.optJSONArray("marks");
+                if (marksArray == null) {
+                    marksArray = new JSONArray();
+                }
                 Map<Integer, Mark> marks = new HashMap<>();
 
                 this.cumulativeMarks = new HashMap<>();
@@ -1615,14 +1745,15 @@ public class VTOPService extends Service {
 
                     int courseType = Course.TYPE_THEORY;
 
-                    if (markObject.getString("course_type").equals("lab")) {
+                    String rawCourseType = markObject.optString("course_type", "theory");
+                    if (rawCourseType.equals("lab")) {
                         courseType = Course.TYPE_LAB;
-                    } else if (markObject.getString("course_type").equals("project")) {
+                    } else if (rawCourseType.equals("project")) {
                         courseType = Course.TYPE_PROJECT;
                     }
 
                     mark.id = i + 1;
-                    mark.courseId = this.getCourseId(markObject.getString("slot"), courseType);
+                    mark.courseId = this.getCourseId(markObject.optString("slot"), courseType);
                     mark.title = this.getStringValue(markObject, "title");
                     mark.score = this.getDoubleValue(markObject, "score");
                     mark.maxScore = this.getDoubleValue(markObject, "max_score");
@@ -1634,54 +1765,54 @@ public class VTOPService extends Service {
                     String courseCode = this.getCourseCode(mark.courseId, courseType);
                     Integer courseCredits = this.getCourseCredits(mark.courseId, courseType);
 
-                    if (!this.cumulativeMarks.containsKey(courseCode)) {
-                        this.cumulativeMarks.put(courseCode, new CumulativeMark(++j));
+                    if (courseCode != null) {
+                        if (!this.cumulativeMarks.containsKey(courseCode)) {
+                            this.cumulativeMarks.put(courseCode, new CumulativeMark(++j));
+                        }
+
+                        CumulativeMark cm = this.cumulativeMarks.get(courseCode);
+                        if (cm != null) {
+                            cm.courseCode = courseCode;
+                            cm.addWeightage(mark.weightage, mark.maxWeightage, courseType, courseCredits);
+                        }
                     }
 
-                    Objects.requireNonNull(this.cumulativeMarks.get(courseCode)).courseCode = courseCode;
-                    Objects.requireNonNull(this.cumulativeMarks.get(courseCode)).addWeightage(mark.weightage, mark.maxWeightage, courseType, courseCredits);
-
                     // Generating a unique hash signature to keep a track of read marks
-                    mark.signature = (courseCode + markObject.getString("course_type") + mark.title + mark.score).hashCode();
+                    mark.signature = ((courseCode != null ? courseCode : "") + rawCourseType + (mark.title != null ? mark.title : "") + (mark.score != null ? mark.score : 0.0)).hashCode();
                     marks.put(mark.signature, mark);
                 }
 
-                for (Map.Entry<String, CumulativeMark> cumulativeMark : this.cumulativeMarks.entrySet()) {
-                    Double theoryTotal = cumulativeMark.getValue().theoryTotal;
-                    Double labTotal = cumulativeMark.getValue().labTotal;
-                    Double projectTotal = cumulativeMark.getValue().projectTotal;
+                for (Map.Entry<String, CumulativeMark> entry : this.cumulativeMarks.entrySet()) {
+                    CumulativeMark cumulativeMark = entry.getValue();
+                    if (cumulativeMark == null) continue;
 
-                    Double theoryMax = cumulativeMark.getValue().theoryMax;
-                    Double labMax = cumulativeMark.getValue().labMax;
-                    Double projectMax = cumulativeMark.getValue().projectMax;
+                    Double theoryTotal = cumulativeMark.theoryTotal != null ? cumulativeMark.theoryTotal : 0.0;
+                    Double labTotal = cumulativeMark.labTotal != null ? cumulativeMark.labTotal : 0.0;
+                    Double projectTotal = cumulativeMark.projectTotal != null ? cumulativeMark.projectTotal : 0.0;
 
-                    if (theoryTotal == null) {
-                        theoryTotal = (double) 0;
-                        theoryMax = (double) 0;
+                    Double theoryMax = cumulativeMark.theoryMax != null ? cumulativeMark.theoryMax : 0.0;
+                    Double labMax = cumulativeMark.labMax != null ? cumulativeMark.labMax : 0.0;
+                    Double projectMax = cumulativeMark.projectMax != null ? cumulativeMark.projectMax : 0.0;
+
+                    int theoryCredits = cumulativeMark.theoryCredits;
+                    int labCredits = cumulativeMark.labCredits;
+                    int projectCredits = cumulativeMark.projectCredits;
+                    int totalCredits = theoryCredits + labCredits + projectCredits;
+
+                    if (totalCredits > 0) {
+                        double grandTotal = (theoryTotal * theoryCredits + labTotal * labCredits + projectTotal * projectCredits) / totalCredits;
+                        double grandMax = (theoryMax * theoryCredits + labMax * labCredits + projectMax * projectCredits) / totalCredits;
+                        cumulativeMark.grandTotal = grandTotal;
+                        cumulativeMark.grandMax = grandMax;
+                    } else {
+                        cumulativeMark.grandTotal = theoryTotal + labTotal + projectTotal;
+                        cumulativeMark.grandMax = theoryMax + labMax + projectMax;
                     }
+                }
 
-                    if (labTotal == null) {
-                        labTotal = (double) 0;
-                        labMax = (double) 0;
-                    }
-
-                    if (projectTotal == null) {
-                        projectTotal = (double) 0;
-                        projectMax = (double) 0;
-                    }
-
-                    int theoryCredits = cumulativeMark.getValue().theoryCredits;
-                    int labCredits = cumulativeMark.getValue().labCredits;
-                    int projectCredits = cumulativeMark.getValue().projectCredits;
-
-                    double grandTotal = (theoryTotal * theoryCredits + labTotal * labCredits + projectTotal * projectCredits);
-                    double grandMax = (theoryMax * theoryCredits + labMax * labCredits + projectMax * projectCredits);
-
-                    grandTotal /= theoryCredits + labCredits + projectCredits;
-                    grandMax /= theoryCredits + labCredits + projectCredits;
-
-                    Objects.requireNonNull(this.cumulativeMarks.get(cumulativeMark.getKey())).grandTotal = grandTotal;
-                    Objects.requireNonNull(this.cumulativeMarks.get(cumulativeMark.getKey())).grandMax = grandMax;
+                if (marks.isEmpty()) {
+                    downloadGrades();
+                    return;
                 }
 
                 appDatabase.marksDao()
@@ -1702,10 +1833,12 @@ public class VTOPService extends Service {
                             @Override
                             public void onError(@NonNull Throwable e) {
                                 error(702, e.getLocalizedMessage());
+                                downloadGrades();
                             }
                         });
             } catch (Exception e) {
                 error(701, e.getLocalizedMessage());
+                downloadGrades();
             }
         });
     }
@@ -1731,76 +1864,110 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val();" +
                 "var response = {" +
                 "    grades: []," +
                 "    gpa: null" +
                 "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'examinations/examGradeView/doStudentGradeView'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if(res.toLowerCase().includes('no records')) {" +
-                "            return;" +
-                "        }" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var table = doc.getElementsByTagName('table')[0];" +
-                "        var headings = table.getElementsByTagName('th');" +
-                "        var courseCodeIndex, gradeIndex, creditsIndex, creditsSpan;" +
-                "        for (var i = 0; i < headings.length; ++i) {" +
-                "            var heading = headings[i].innerText.toLowerCase();" +
-                "            if (heading.includes('code')) {" +
-                "                courseCodeIndex = i;" +
-                "            } else if (heading.includes('credits')) {" +
-                "                creditsIndex = i;" +
-                "                creditsSpan = headings[i].colSpan;" +
-                "            } else if (heading.includes('grade')) {" +
-                "                gradeIndex = i;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + authId + '&_csrf=' + csrf;" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'examinations/examGradeView/doStudentGradeView'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if (!res || res.toLowerCase().includes('no records')) {" +
+                "                return;" +
+                "            }" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var table = doc.getElementsByTagName('table')[0];" +
+                "            if (!table) return;" +
+                "            var headings = table.getElementsByTagName('th');" +
+                "            if (!headings || headings.length === 0) headings = table.getElementsByTagName('td');" +
+                "            if (!headings || headings.length === 0) return;" +
+                "            var courseCodeIndex = -1, gradeIndex = -1, creditsIndex = -1, creditsSpan = 1;" +
+                "            for (var i = 0; i < headings.length; ++i) {" +
+                "                var heading = (headings[i].innerText || '').toLowerCase();" +
+                "                if (heading.includes('code')) {" +
+                "                    courseCodeIndex = i;" +
+                "                } else if (heading.includes('credits')) {" +
+                "                    creditsIndex = i;" +
+                "                    creditsSpan = headings[i].colSpan || 1;" +
+                "                } else if (heading.includes('grade')) {" +
+                "                    gradeIndex = i;" +
+                "                }" +
+                "            }" +
+                "            if (creditsIndex >= 0 && courseCodeIndex > creditsIndex) {" +
+                "                courseCodeIndex += creditsSpan - 1;" +
+                "            }" +
+                "            if (creditsIndex >= 0 && gradeIndex > creditsIndex) {" +
+                "                gradeIndex += creditsSpan - 1;" +
+                "            }" +
+                "            var cells = table.getElementsByTagName('td');" +
+                "            while(courseCodeIndex >= 0 && courseCodeIndex < cells.length && gradeIndex >= 0 && gradeIndex < cells.length) {" +
+                "                var grade = {};" +
+                "                grade.course_code = (cells[courseCodeIndex].innerText || '').trim();" +
+                "                grade.grade = (cells[gradeIndex].innerText || '').trim();" +
+                "                response.grades.push(grade);" +
+                "                courseCodeIndex += headings.length - 1;" +
+                "                gradeIndex += headings.length - 1;" +
+                "            }" +
+                "            if (cells && cells.length > 0) {" +
+                "                var lastCellText = (cells[cells.length - 1].innerText || '').trim();" +
+                "                if (lastCellText.includes(':')) {" +
+                "                    var gpaParts = lastCellText.split(':');" +
+                "                    if (gpaParts.length > 1) {" +
+                "                        response.gpa = gpaParts[1].trim();" +
+                "                    }" +
+                "                }" +
                 "            }" +
                 "        }" +
-                "        if (courseCodeIndex > creditsIndex) {" +
-                "            courseCodeIndex += creditsSpan - 1;" +
-                "        }" +
-                "        if (gradeIndex > creditsIndex) {" +
-                "            gradeIndex += creditsSpan - 1;" +
-                "        }" +
-                "        var cells = table.getElementsByTagName('td');" +
-                "        while(courseCodeIndex < cells.length && gradeIndex < cells.length) {" +
-                "            var grade = {};" +
-                "            grade.course_code = cells[courseCodeIndex].innerText.trim();" +
-                "            grade.grade = cells[gradeIndex].innerText.trim();" +
-                "            response.grades.push(grade);" +
-                "            courseCodeIndex += headings.length - 1;" +
-                "            gradeIndex += headings.length - 1;" +
-                "        }" +
-                "        response.gpa = cells[cells.length - 1].innerText.split(':')[1].trim();" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    onStreamComplete("MarksAndGrades");
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray gradesArray = response.getJSONArray("grades");
+                JSONArray gradesArray = response.optJSONArray("grades");
 
-                for (int i = 0; i < gradesArray.length(); ++i) {
-                    JSONObject gradesObject = gradesArray.getJSONObject(i);
+                if (gradesArray != null && this.cumulativeMarks != null) {
+                    for (int i = 0; i < gradesArray.length(); ++i) {
+                        JSONObject gradesObject = gradesArray.getJSONObject(i);
+                        String courseCode = this.getStringValue(gradesObject, "course_code");
 
-                    String courseCode = this.getStringValue(gradesObject, "course_code");
-
-                    if (this.cumulativeMarks.containsKey(courseCode)) {
-                        Objects.requireNonNull(this.cumulativeMarks.get(courseCode)).grade = gradesObject.getString("grade");
+                        if (courseCode != null && this.cumulativeMarks.containsKey(courseCode)) {
+                            CumulativeMark cm = this.cumulativeMarks.get(courseCode);
+                            if (cm != null) {
+                                cm.grade = this.getStringValue(gradesObject, "grade");
+                            }
+                        }
                     }
                 }
 
-                this.sharedPreferences.edit().putString("gpa", response.getString("gpa")).apply();
+                if (response.has("gpa") && !response.isNull("gpa")) {
+                    String gpa = response.optString("gpa", "");
+                    if (!gpa.isEmpty()) {
+                        this.sharedPreferences.edit().putString("gpa", gpa).apply();
+                    }
+                }
 
-                List<CumulativeMark> cumulativeMarks = new ArrayList<>(this.cumulativeMarks.values());
+                List<CumulativeMark> cumulativeMarks = this.cumulativeMarks != null
+                        ? new ArrayList<>(this.cumulativeMarks.values())
+                        : new ArrayList<>();
                 MarksDao marksDao = this.appDatabase.marksDao();
 
                 marksDao.deleteCumulativeMarks()
-                        .andThen(marksDao.insertCumulativeMarks(cumulativeMarks))
+                        .andThen(cumulativeMarks.isEmpty() ? Completable.complete() : marksDao.insertCumulativeMarks(cumulativeMarks))
                         .subscribeOn(Schedulers.single())
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(new CompletableObserver() {
@@ -1853,78 +2020,99 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + $('#authorizedIDX').val()  + '&_csrf=' + $('input[name=\"_csrf\"]').val();" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url: 'examinations/doSearchExamScheduleForStudent'," +
-                "    data: data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if(res.toLowerCase().includes('not found')) {" +
-                "            return;" +
-                "        }" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var slotIndex, dateIndex, timingIndex, venueIndex, locationIndex, numberIndex;" +
-                "        var columns = doc.getElementsByTagName('tr')[0].getElementsByTagName('td');" +
-                "        for (var i = 0; i < columns.length; ++i) {" +
-                "            var heading = columns[i].innerText.toLowerCase();" +
-                "            if (heading.includes('slot')) {" +
-                "                slotIndex = i;" +
-                "            } else if (heading.includes('date')) {" +
-                "                dateIndex = i;" +
-                "            } else if (heading.includes('exam') && heading.includes('time')) {" +
-                "                timingIndex = i;" +
-                "            } else if (heading.includes('venue')) {" +
-                "                venueIndex = i;" +
-                "            } else if (heading.includes('location')) {" +
-                "                locationIndex = i;" +
-                "            } else if (heading.includes('seat') && heading.includes('no.')) {" +
-                "                numberIndex = i;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var data = 'semesterSubId=' + '" + semesterID + "' + '&authorizedID=' + authId + '&_csrf=' + csrf;" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url: 'examinations/doSearchExamScheduleForStudent'," +
+                "        data: data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if (!res || res.toLowerCase().includes('not found')) {" +
+                "                return;" +
                 "            }" +
-                "        }" +
-                "        var examTitle = '', exam = {}, cells = doc.getElementsByTagName('td');" +
-                "        for (var i = columns.length; i < cells.length; ++i) {" +
-                "            if (cells[i].colSpan > 1) {" +
-                "                examTitle = cells[i].innerText.trim();" +
-                "                response[examTitle] = [];" +
-                "                continue;" +
-                "            }" +
-                "            var index = (i - Object.keys(response).length) % columns.length;" +
-                "            if (index == slotIndex) {" +
-                "                exam.slot = cells[i].innerText.trim().split('+')[0];" +
-                "            } else if (index == dateIndex) {" +
-                "                var date = cells[i].innerText.trim().toUpperCase();" +
-                "                exam.date = date == '' ? null : date;" +
-                "            } else if (index == timingIndex) {" +
-                "                var timings = cells[i].innerText.trim().split('-');" +
-                "                if (timings.length == 2) {" +
-                "                    exam.start_time = timings[0].trim();" +
-                "                    exam.end_time = timings[1].trim();" +
-                "                } else {" +
-                "                    exam.start_time = null;" +
-                "                    exam.end_time = null;" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var trs = doc.getElementsByTagName('tr');" +
+                "            if (!trs || trs.length === 0) return;" +
+                "            var columns = trs[0].getElementsByTagName('td');" +
+                "            if (!columns || columns.length === 0) columns = trs[0].getElementsByTagName('th');" +
+                "            if (!columns || columns.length === 0) return;" +
+                "            var slotIndex = -1, dateIndex = -1, timingIndex = -1, venueIndex = -1, locationIndex = -1, numberIndex = -1;" +
+                "            for (var i = 0; i < columns.length; ++i) {" +
+                "                var heading = (columns[i].innerText || '').toLowerCase();" +
+                "                if (heading.includes('slot')) {" +
+                "                    slotIndex = i;" +
+                "                } else if (heading.includes('date')) {" +
+                "                    dateIndex = i;" +
+                "                } else if (heading.includes('exam') && heading.includes('time')) {" +
+                "                    timingIndex = i;" +
+                "                } else if (heading.includes('venue')) {" +
+                "                    venueIndex = i;" +
+                "                } else if (heading.includes('location')) {" +
+                "                    locationIndex = i;" +
+                "                } else if (heading.includes('seat') && heading.includes('no.')) {" +
+                "                    numberIndex = i;" +
                 "                }" +
-                "            } else if (index == venueIndex) {" +
-                "                var venue = cells[i].innerText.trim();" +
-                "                exam.venue = venue.replace(/-/g,'') == '' ? null : venue;" +
-                "            } else if (index == locationIndex) {" +
-                "                var location = cells[i].innerText.trim();" +
-                "                exam.seat_location = location.replace(/-/g,'') == '' ? null : location;" +
-                "            } else if (index == numberIndex) {" +
-                "                var number = cells[i].innerText.trim();" +
-                "                exam.seat_number = number.replace(/-/g,'') == '' ? null : parseInt(number);" +
                 "            }" +
-                "            if (Object.keys(exam).length == 7) {" +
-                "                response[examTitle].push(exam);" +
-                "                exam = {};" +
+                "            var examTitle = '', exam = {}, cells = doc.getElementsByTagName('td');" +
+                "            for (var i = columns.length; i < cells.length; ++i) {" +
+                "                if (cells[i].colSpan > 1) {" +
+                "                    examTitle = (cells[i].innerText || '').trim();" +
+                "                    if (examTitle) {" +
+                "                        response[examTitle] = [];" +
+                "                    }" +
+                "                    continue;" +
+                "                }" +
+                "                if (!examTitle) continue;" +
+                "                var index = (i - Object.keys(response).length) % columns.length;" +
+                "                if (index == slotIndex) {" +
+                "                    exam.slot = (cells[i].innerText || '').trim().split('+')[0];" +
+                "                } else if (index == dateIndex) {" +
+                "                    var date = (cells[i].innerText || '').trim().toUpperCase();" +
+                "                    exam.date = date == '' ? null : date;" +
+                "                } else if (index == timingIndex) {" +
+                "                    var timings = (cells[i].innerText || '').trim().split('-');" +
+                "                    if (timings.length == 2) {" +
+                "                        exam.start_time = timings[0].trim();" +
+                "                        exam.end_time = timings[1].trim();" +
+                "                    } else {" +
+                "                        exam.start_time = null;" +
+                "                        exam.end_time = null;" +
+                "                    }" +
+                "                } else if (index == venueIndex) {" +
+                "                    var venue = (cells[i].innerText || '').trim();" +
+                "                    exam.venue = venue.replace(/-/g,'') == '' ? null : venue;" +
+                "                } else if (index == locationIndex) {" +
+                "                    var location = (cells[i].innerText || '').trim();" +
+                "                    exam.seat_location = location.replace(/-/g,'') == '' ? null : location;" +
+                "                } else if (index == numberIndex) {" +
+                "                    var number = (cells[i].innerText || '').trim();" +
+                "                    exam.seat_number = number.replace(/-/g,'') == '' ? null : parseInt(number);" +
+                "                }" +
+                "                if (Object.keys(exam).length == 7) {" +
+                "                    if (response[examTitle]) {" +
+                "                        response[examTitle].push(exam);" +
+                "                    }" +
+                "                    exam = {};" +
+                "                }" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    onStreamComplete("ExamSchedule");
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
                 Iterator<String> keys = response.keys();
                 List<Exam> exams = new ArrayList<>();
@@ -1936,7 +2124,9 @@ public class VTOPService extends Service {
 
                 while (keys.hasNext()) {
                     String key = keys.next();
-                    JSONArray examsArray = response.getJSONArray(key);
+                    if (key.equals("error")) continue;
+                    JSONArray examsArray = response.optJSONArray(key);
+                    if (examsArray == null) continue;
 
                     for (int i = 0; i < examsArray.length(); ++i) {
                         JSONObject examObject = examsArray.getJSONObject(i);
@@ -1945,23 +2135,34 @@ public class VTOPService extends Service {
                         Matcher matcher = pattern.matcher(key);
 
                         exam.id = ++index;
-                        exam.courseId = getCourseId(examObject.getString("slot"), Course.TYPE_THEORY);
+                        exam.courseId = getCourseId(examObject.optString("slot", ""), Course.TYPE_THEORY);
                         exam.title = key;
 
                         if (matcher.find()) {
                             exam.title = new StringBuilder(key).insert(matcher.start(), " ").toString().trim().replaceAll(" +", " ");
                         }
 
-                        if (!examObject.isNull("date")) {
-                            if (!examObject.isNull("start_time")) {
-                                exam.startTime = Objects.requireNonNull(dateTimeFormat.parse(examObject.getString("date") + " " + examObject.getString("start_time"))).getTime();
-                            } else {
-                                exam.startTime = Objects.requireNonNull(dateFormat.parse(examObject.getString("date"))).getTime();
-                            }
+                        String dateStr = getStringValue(examObject, "date");
+                        String startTimeStr = getStringValue(examObject, "start_time");
+                        String endTimeStr = getStringValue(examObject, "end_time");
 
-                            if (!examObject.isNull("end_time")) {
-                                exam.endTime = Objects.requireNonNull(dateTimeFormat.parse(examObject.getString("date") + " " + examObject.getString("end_time"))).getTime();
-                            }
+                        if (dateStr != null && !dateStr.isEmpty()) {
+                            try {
+                                if (startTimeStr != null && !startTimeStr.isEmpty()) {
+                                    Date parsed = dateTimeFormat.parse(dateStr + " " + startTimeStr);
+                                    if (parsed != null) exam.startTime = parsed.getTime();
+                                } else {
+                                    Date parsed = dateFormat.parse(dateStr);
+                                    if (parsed != null) exam.startTime = parsed.getTime();
+                                }
+                            } catch (Exception ignored) {}
+
+                            try {
+                                if (endTimeStr != null && !endTimeStr.isEmpty()) {
+                                    Date parsed = dateTimeFormat.parse(dateStr + " " + endTimeStr);
+                                    if (parsed != null) exam.endTime = parsed.getTime();
+                                }
+                            } catch (Exception ignored) {}
                         }
 
                         exam.venue = getStringValue(examObject, "venue");
@@ -2021,34 +2222,57 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'verifyMenu=true&winImage=' + $('#winImage').val() + '&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {" +
                 "    proctor: []" +
                 "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'proctor/viewProctorDetails'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var cells = doc.getElementById('showDetails').getElementsByTagName('td');" +
-                "        for(var i = 0; i < cells.length; ++i) {" +
-                "            if(cells[i].innerHTML.includes('img')) {" +
-                "                continue;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var winImageEl = document.getElementById('winImage') || document.querySelector('input[name=\"winImage\"]');" +
+                "    var winImage = winImageEl ? winImageEl.value : '';" +
+                "    var data = 'verifyMenu=true&winImage=' + winImage + '&authorizedID=' + authId + '&_csrf=' + csrf + '&nocache=@(new Date().getTime())';" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'proctor/viewProctorDetails'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var showDetails = doc.getElementById('showDetails');" +
+                "            if (showDetails) {" +
+                "                var cells = showDetails.getElementsByTagName('td');" +
+                "                for (var i = 0; i < cells.length; ++i) {" +
+                "                    if (cells[i].innerHTML.includes('img')) {" +
+                "                        continue;" +
+                "                    }" +
+                "                    var record = {};" +
+                "                    record.key = cells[i].innerText ? cells[i].innerText.trim() : null;" +
+                "                    if (i + 1 < cells.length) {" +
+                "                        i++;" +
+                "                        record.value = cells[i].innerText ? cells[i].innerText.trim() : null;" +
+                "                    } else {" +
+                "                        record.value = null;" +
+                "                    }" +
+                "                    response.proctor.push(record);" +
+                "                }" +
                 "            }" +
-                "            var record = {};" +
-                "            record.key = cells[i].innerText.trim() || null;" +
-                "            record.value = cells[++i].innerText.trim() || null;" +
-                "            response.proctor.push(record);" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    downloadDeanHOD(0);
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray proctorArray = response.getJSONArray("proctor");
+                JSONArray proctorArray = response.optJSONArray("proctor");
+                if (proctorArray == null) proctorArray = new JSONArray();
                 List<Staff> staff = new ArrayList<>();
 
                 for (int i = 0; i < proctorArray.length(); ++i) {
@@ -2117,36 +2341,55 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'verifyMenu=true&winImage=' + $('#winImage').val() + '&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'hrms/viewHodDeanDetails'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var tables = doc.getElementsByTagName('table');" +
-                "        var headings = doc.getElementsByTagName('h3');" +
-                "        for (var i = 0; i < tables.length; ++i) {" +
-                "            var heading = headings[i].innerText.toLowerCase().trim();" +
-                "            var cells = tables[i].getElementsByTagName('td');" +
-                "            response[heading] = [];" +
-                "            for (var j = 0; j < cells.length; ++j) {" +
-                "                if(cells[j].innerHTML.includes('img')) {" +
-                "                    continue;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var winImageEl = document.getElementById('winImage') || document.querySelector('input[name=\"winImage\"]');" +
+                "    var winImage = winImageEl ? winImageEl.value : '';" +
+                "    var data = 'verifyMenu=true&winImage=' + winImage + '&authorizedID=' + authId + '&_csrf=' + csrf + '&nocache=@(new Date().getTime())';" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'hrms/viewHodDeanDetails'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var tables = doc.getElementsByTagName('table');" +
+                "            var headings = doc.getElementsByTagName('h3');" +
+                "            for (var i = 0; i < tables.length; ++i) {" +
+                "                var heading = (i < headings.length && headings[i].innerText) ? headings[i].innerText.toLowerCase().trim() : ('staff_' + i);" +
+                "                var cells = tables[i].getElementsByTagName('td');" +
+                "                response[heading] = [];" +
+                "                for (var j = 0; j < cells.length; ++j) {" +
+                "                    if(cells[j].innerHTML.includes('img')) {" +
+                "                        continue;" +
+                "                    }" +
+                "                    var record = {};" +
+                "                    record.key = cells[j].innerText ? cells[j].innerText.trim() : null;" +
+                "                    if (j + 1 < cells.length) {" +
+                "                        j++;" +
+                "                        record.value = cells[j].innerText ? cells[j].innerText.trim() : null;" +
+                "                    } else {" +
+                "                        record.value = null;" +
+                "                    }" +
+                "                    response[heading].push(record);" +
                 "                }" +
-                "                var record = {};" +
-                "                record.key = cells[j].innerText.trim() || null;" +
-                "                record.value = cells[++j].innerText.trim() || null;" +
-                "                response[heading].push(record);" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    onStreamComplete("Staff");
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
                 Iterator<String> keys = response.keys();
                 List<Staff> staff = new ArrayList<>();
@@ -2154,7 +2397,9 @@ public class VTOPService extends Service {
 
                 while (keys.hasNext()) {
                     String staffType = keys.next();
-                    JSONArray staffArray = response.getJSONArray(staffType);
+                    if (staffType.equals("error")) continue;
+                    JSONArray staffArray = response.optJSONArray(staffType);
+                    if (staffArray == null) continue;
 
                     if (staffType.contains("dean")) {
                         staffType = "dean";
@@ -2227,53 +2472,69 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = '_csrf=' + $('input[name=\"_csrf\"]').val() + '&authorizedID=' + $('#authorizedIDX').val() + '&x=';" +
                 "var response = {" +
                 "    spotlight: []" +
                 "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'home'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        if(!doc.getElementsByClassName('box-info')) {" +
-                "            return;" +
-                "        }" +
-                "        var sheets = doc.getElementsByClassName('offcanvas');" +
-                "        for(var i = 0; i < sheets.length; ++i) {" +
-                "            const header = sheets[i].getElementsByClassName('offcanvas-header')[0];" +
-                "            const title = header.getElementsByTagName('span')[0];" +
-                "            if (title === undefined) {" +
-                "                continue;" +
-                "            }" +
-                "            const category = title.textContent;" +
-                "            var announcements = sheets[i].getElementsByClassName('offcanvas-body')[0].getElementsByTagName('li');" +
-                "            for(var j = 0; j < announcements.length; ++j) {" +
-                "                var spotlightItem = {};" +
-                "                spotlightItem.category = category;" +
-                "                spotlightItem.announcement = announcements[j].textContent.replace(/\\t/g,'').replace(/\\n/g,' ').trim();" +
-                "                if (announcements[j].getElementsByTagName('a').length == 0) {" +
-                "                    spotlightItem.link = null;" +
-                "                } else {" +
-                "                    var link = announcements[j].getElementsByTagName('a')[0];" +
-                "                    if(link.getAttribute('onclick')) {" +
-                "                        spotlightItem.link = link.getAttribute('onclick').split('\\'')[1];" +
-                "                    } else {" +
-                "                        spotlightItem.link = link.href;" +
-                "                    }" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var data = '_csrf=' + csrf + '&authorizedID=' + authId + '&x=';" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'home'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var sheets = doc.getElementsByClassName('offcanvas');" +
+                "            for(var i = 0; i < sheets.length; ++i) {" +
+                "                var header = sheets[i].getElementsByClassName('offcanvas-header')[0];" +
+                "                if (!header) continue;" +
+                "                var title = header.getElementsByTagName('span')[0];" +
+                "                if (title === undefined) {" +
+                "                    continue;" +
                 "                }" +
-                "                response.spotlight.push(spotlightItem);" +
+                "                var category = title.textContent || '';" +
+                "                var body = sheets[i].getElementsByClassName('offcanvas-body')[0];" +
+                "                if (!body) continue;" +
+                "                var announcements = body.getElementsByTagName('li');" +
+                "                for(var j = 0; j < announcements.length; ++j) {" +
+                "                    var spotlightItem = {};" +
+                "                    spotlightItem.category = category;" +
+                "                    spotlightItem.announcement = (announcements[j].textContent || '').replace(/\\t/g,'').replace(/\\n/g,' ').trim();" +
+                "                    var aTags = announcements[j].getElementsByTagName('a');" +
+                "                    if (aTags.length == 0) {" +
+                "                        spotlightItem.link = null;" +
+                "                    } else {" +
+                "                        var link = aTags[0];" +
+                "                        if(link.getAttribute('onclick')) {" +
+                "                            var onclickStr = link.getAttribute('onclick');" +
+                "                            var parts = onclickStr.split('\\'');" +
+                "                            spotlightItem.link = parts.length > 1 ? parts[1] : null;" +
+                "                        } else {" +
+                "                            spotlightItem.link = link.href;" +
+                "                        }" +
+                "                    }" +
+                "                    response.spotlight.push(spotlightItem);" +
+                "                }" +
                 "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    onStreamComplete("Spotlight");
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray spotlightArray = response.getJSONArray("spotlight");
+                JSONArray spotlightArray = response.optJSONArray("spotlight");
+                if (spotlightArray == null) spotlightArray = new JSONArray();
                 Map<Integer, Spotlight> spotlight = new HashMap<>();
 
                 for (int i = 0; i < spotlightArray.length(); ++i) {
@@ -2286,7 +2547,7 @@ public class VTOPService extends Service {
                     spotlightItem.link = this.getStringValue(spotlightObject, "link");
 
                     // Generating a unique hash signature to keep a track of read announcements
-                    spotlightItem.signature = (spotlightItem.announcement + spotlightItem.link).hashCode();
+                    spotlightItem.signature = ((spotlightItem.announcement != null ? spotlightItem.announcement : "") + (spotlightItem.link != null ? spotlightItem.link : "")).hashCode();
                     spotlight.put(spotlightItem.signature, spotlightItem);
                 }
 
@@ -2338,63 +2599,87 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'verifyMenu=true&winImage=' + $('#winImage').val() + '&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {" +
                 "    receipts: []" +
                 "};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'p2p/getReceiptsApplno'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "        var headings = doc.getElementsByTagName('tr')[0].getElementsByTagName('td');" +
-                "        var cells = doc.getElementsByTagName('td');" +
-                "        var receiptIndex, amountIndex, dateIndex;" +
-                "        for(var i = 0; i < headings.length; ++i) {" +
-                "            var heading = headings[i].innerText.toLowerCase();" +
-                "            if(heading.includes('receipt')) {" +
-                "                receiptIndex = i + headings.length;" +
-                "            } else if (heading.includes('date')) {" +
-                "                dateIndex = i + headings.length;" +
-                "            } else if (heading.includes('amount')) {" +
-                "                amountIndex = i + headings.length;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var winImageEl = document.getElementById('winImage') || document.querySelector('input[name=\"winImage\"]');" +
+                "    var winImage = winImageEl ? winImageEl.value : '';" +
+                "    var data = 'verifyMenu=true&winImage=' + winImage + '&authorizedID=' + authId + '&_csrf=' + csrf + '&nocache=@(new Date().getTime())';" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'p2p/getReceiptsApplno'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
+                "            var trs = doc.getElementsByTagName('tr');" +
+                "            if (!trs || trs.length === 0) return;" +
+                "            var headings = trs[0].getElementsByTagName('td');" +
+                "            if (!headings || headings.length === 0) headings = trs[0].getElementsByTagName('th');" +
+                "            if (!headings || headings.length === 0) return;" +
+                "            var cells = doc.getElementsByTagName('td');" +
+                "            var receiptIndex = -1, amountIndex = -1, dateIndex = -1;" +
+                "            for(var i = 0; i < headings.length; ++i) {" +
+                "                var heading = (headings[i].innerText || '').toLowerCase();" +
+                "                if(heading.includes('receipt')) {" +
+                "                    receiptIndex = i + headings.length;" +
+                "                } else if (heading.includes('date')) {" +
+                "                    dateIndex = i + headings.length;" +
+                "                } else if (heading.includes('amount')) {" +
+                "                    amountIndex = i + headings.length;" +
+                "                }" +
+                "            }" +
+                "            while (receiptIndex >= 0 && receiptIndex < cells.length && amountIndex >= 0 && amountIndex < cells.length && dateIndex >= 0 && dateIndex < cells.length) {" +
+                "                var receipt = {};" +
+                "                receipt.number = parseInt(cells[receiptIndex].innerText.trim()) || null;" +
+                "                receipt.amount = parseFloat(cells[amountIndex].innerText.trim()) || 0;" +
+                "                receipt.date = (cells[dateIndex].innerText || '').trim();" +
+                "                response.receipts.push(receipt);" +
+                "                receiptIndex += headings.length;" +
+                "                amountIndex += headings.length;" +
+                "                dateIndex += headings.length;" +
                 "            }" +
                 "        }" +
-                "        while (receiptIndex < cells.length && amountIndex < cells.length && dateIndex < cells.length) {" +
-                "            var receipt = {};" +
-                "            receipt.number = parseInt(cells[receiptIndex].innerText.trim()) || null;" +
-                "            receipt.amount = parseFloat(cells[amountIndex].innerText.trim()) || 0;" +
-                "            receipt.date = cells[dateIndex].innerText.trim();" +
-                "            response.receipts.push(receipt);" +
-                "            receiptIndex += headings.length;" +
-                "            amountIndex += headings.length;" +
-                "            dateIndex += headings.length;" +
-                "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
+                if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
+                    checkDues();
+                    return;
+                }
                 JSONObject response = new JSONObject(responseString);
-                JSONArray receiptsArray = response.getJSONArray("receipts");
+                JSONArray receiptsArray = response.optJSONArray("receipts");
+                if (receiptsArray == null) receiptsArray = new JSONArray();
                 List<Receipt> receipts = new ArrayList<>();
+                SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH);
 
                 for (int i = 0; i < receiptsArray.length(); ++i) {
                     JSONObject receiptsObject = receiptsArray.getJSONObject(i);
                     Receipt receipt = new Receipt();
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH);
 
                     // If this is true, there's a web scrapping issue
-                    if (receiptsObject.isNull("number")) {
+                    if (receiptsObject.isNull("number") || !receiptsObject.has("number")) {
                         continue;
                     }
 
                     String receiptDateString = this.getStringValue(receiptsObject, "date");
-                    Date receiptDate = receiptDateString != null ? dateFormat.parse(receiptDateString) : null;
+                    Date receiptDate = null;
+                    if (receiptDateString != null) {
+                        try {
+                            receiptDate = dateFormat.parse(receiptDateString);
+                        } catch (Exception ignored) {}
+                    }
 
-                    receipt.number = receiptsObject.getInt("number");
+                    receipt.number = receiptsObject.optInt("number");
                     receipt.amount = this.getDoubleValue(receiptsObject, "amount");
                     receipt.date = receiptDate != null ? receiptDate.getTime() : 0;
 
@@ -2443,31 +2728,43 @@ public class VTOPService extends Service {
          *  }
          */
         webView.evaluateJavascript("(function() {" +
-                "var data = 'verifyMenu=true&winImage=' + $('#winImage').val() + '&authorizedID=' + $('#authorizedIDX').val() + '&_csrf=' + $('input[name=\"_csrf\"]').val() + '&nocache=@(new Date().getTime())';" +
                 "var response = {};" +
-                "$.ajax({" +
-                "    type: 'POST'," +
-                "    url : 'p2p/Payments'," +
-                "    data : data," +
-                "    async: false," +
-                "    success: function(res) {" +
-                "        if (res.toLowerCase().includes('no payment dues')) {" +
-                "            response.due_payments = false;" +
-                "        } else {" +
-                "            response.due_payments = true;" +
+                "try {" +
+                "    var csrfEl = document.querySelector('input[name=\"_csrf\"]');" +
+                "    var csrf = csrfEl ? csrfEl.value : '';" +
+                "    var authIdEl = document.getElementById('authorizedIDX') || document.querySelector('input[name=\"authorizedID\"]');" +
+                "    var authId = authIdEl ? authIdEl.value : '';" +
+                "    var winImageEl = document.getElementById('winImage') || document.querySelector('input[name=\"winImage\"]');" +
+                "    var winImage = winImageEl ? winImageEl.value : '';" +
+                "    var data = 'verifyMenu=true&winImage=' + winImage + '&authorizedID=' + authId + '&_csrf=' + csrf + '&nocache=@(new Date().getTime())';" +
+                "    $.ajax({" +
+                "        type: 'POST'," +
+                "        url : 'p2p/Payments'," +
+                "        data : data," +
+                "        async: false," +
+                "        success: function(res) {" +
+                "            if (res && res.toLowerCase().includes('no payment dues')) {" +
+                "                response.due_payments = false;" +
+                "            } else {" +
+                "                response.due_payments = true;" +
+                "            }" +
                 "        }" +
-                "    }" +
-                "});" +
+                "    });" +
+                "} catch(e) {" +
+                "    response.error = e.message;" +
+                "}" +
                 "return response;" +
                 "})();", responseString -> {
             try {
-                JSONObject response = new JSONObject(responseString);
-                boolean duePayments = response.getBoolean("due_payments");
+                if (responseString != null && !responseString.equals("null") && !responseString.trim().isEmpty()) {
+                    JSONObject response = new JSONObject(responseString);
+                    boolean duePayments = response.optBoolean("due_payments", false);
 
-                if (duePayments) {
-                    sharedPreferences.edit().putBoolean("duePayments", true).apply();
-                } else {
-                    sharedPreferences.edit().remove("duePayments").apply();
+                    if (duePayments) {
+                        sharedPreferences.edit().putBoolean("duePayments", true).apply();
+                    } else {
+                        sharedPreferences.edit().remove("duePayments").apply();
+                    }
                 }
             } catch (Exception e) {
                 error(1203, e.getLocalizedMessage());
@@ -2721,25 +3018,28 @@ public class VTOPService extends Service {
      * @return The slot ID
      */
     private Integer getSlotId(String slot, int courseType) {
+        if (slot == null) {
+            return null;
+        }
         switch (courseType) {
             case Course.TYPE_LAB:
-                if (!this.labSlots.containsKey(slot)) {
+                if (this.labSlots == null || !this.labSlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.labSlots.get(slot)).id;
+                Slot s = this.labSlots.get(slot);
+                return s != null ? s.id : null;
             case Course.TYPE_PROJECT:
-                if (!this.projectSlots.containsKey(slot)) {
+                if (this.projectSlots == null || !this.projectSlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.projectSlots.get(slot)).id;
+                Slot s2 = this.projectSlots.get(slot);
+                return s2 != null ? s2.id : null;
             default:
-                if (!this.theorySlots.containsKey(slot)) {
+                if (this.theorySlots == null || !this.theorySlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.theorySlots.get(slot)).id;
+                Slot s3 = this.theorySlots.get(slot);
+                return s3 != null ? s3.id : null;
         }
     }
 
@@ -2750,25 +3050,28 @@ public class VTOPService extends Service {
      * @return The course ID
      */
     private Integer getCourseId(String slot, int courseType) {
+        if (slot == null) {
+            return null;
+        }
         switch (courseType) {
             case Course.TYPE_LAB:
-                if (!this.labSlots.containsKey(slot)) {
+                if (this.labSlots == null || !this.labSlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.labSlots.get(slot)).courseId;
+                Slot s = this.labSlots.get(slot);
+                return s != null ? s.courseId : null;
             case Course.TYPE_PROJECT:
-                if (!this.projectSlots.containsKey(slot)) {
+                if (this.projectSlots == null || !this.projectSlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.projectSlots.get(slot)).courseId;
+                Slot s2 = this.projectSlots.get(slot);
+                return s2 != null ? s2.courseId : null;
             default:
-                if (!this.theorySlots.containsKey(slot)) {
+                if (this.theorySlots == null || !this.theorySlots.containsKey(slot)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.theorySlots.get(slot)).courseId;
+                Slot s3 = this.theorySlots.get(slot);
+                return s3 != null ? s3.courseId : null;
         }
     }
 
@@ -2779,25 +3082,28 @@ public class VTOPService extends Service {
      * @return The number of credits for that course
      */
     private Integer getCourseCredits(Integer courseId, int courseType) {
+        if (courseId == null) {
+            return null;
+        }
         switch (courseType) {
             case Course.TYPE_LAB:
-                if (!this.labCourses.containsKey(courseId)) {
+                if (this.labCourses == null || !this.labCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.labCourses.get(courseId)).credits;
+                Course c = this.labCourses.get(courseId);
+                return c != null ? c.credits : null;
             case Course.TYPE_PROJECT:
-                if (!this.projectCourses.containsKey(courseId)) {
+                if (this.projectCourses == null || !this.projectCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.projectCourses.get(courseId)).credits;
+                Course c2 = this.projectCourses.get(courseId);
+                return c2 != null ? c2.credits : null;
             default:
-                if (!this.theoryCourses.containsKey(courseId)) {
+                if (this.theoryCourses == null || !this.theoryCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.theoryCourses.get(courseId)).credits;
+                Course c3 = this.theoryCourses.get(courseId);
+                return c3 != null ? c3.credits : null;
         }
     }
 
@@ -2808,25 +3114,28 @@ public class VTOPService extends Service {
      * @return The course code of that course
      */
     private String getCourseCode(Integer courseId, int courseType) {
+        if (courseId == null) {
+            return null;
+        }
         switch (courseType) {
             case Course.TYPE_LAB:
-                if (!this.labCourses.containsKey(courseId)) {
+                if (this.labCourses == null || !this.labCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.labCourses.get(courseId)).code;
+                Course c = this.labCourses.get(courseId);
+                return c != null ? c.code : null;
             case Course.TYPE_PROJECT:
-                if (!this.projectCourses.containsKey(courseId)) {
+                if (this.projectCourses == null || !this.projectCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.projectCourses.get(courseId)).code;
+                Course c2 = this.projectCourses.get(courseId);
+                return c2 != null ? c2.code : null;
             default:
-                if (!this.theoryCourses.containsKey(courseId)) {
+                if (this.theoryCourses == null || !this.theoryCourses.containsKey(courseId)) {
                     return null;
                 }
-
-                return Objects.requireNonNull(this.theoryCourses.get(courseId)).code;
+                Course c3 = this.theoryCourses.get(courseId);
+                return c3 != null ? c3.code : null;
         }
     }
 

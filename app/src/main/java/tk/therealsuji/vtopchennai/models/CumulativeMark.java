@@ -57,30 +57,36 @@ public class CumulativeMark {
 
         if (courseType == Course.TYPE_THEORY) {
             if (this.theoryTotal == null) {
-                this.theoryTotal = (double) 0;
-                this.theoryMax = (double) 0;
+                this.theoryTotal = 0.0;
+                this.theoryMax = 0.0;
             }
 
             this.theoryTotal += weightageScore;
-            this.theoryMax += maxWeightage;
+            if (maxWeightage != null) {
+                this.theoryMax += maxWeightage;
+            }
             this.theoryCredits = credits;
         } else if (courseType == Course.TYPE_LAB) {
             if (this.labTotal == null) {
-                this.labTotal = (double) 0;
-                this.labMax = (double) 0;
+                this.labTotal = 0.0;
+                this.labMax = 0.0;
             }
 
             this.labTotal += weightageScore;
-            this.labMax += maxWeightage;
+            if (maxWeightage != null) {
+                this.labMax += maxWeightage;
+            }
             this.labCredits = credits;
         } else if (courseType == Course.TYPE_PROJECT) {
             if (this.projectTotal == null) {
-                this.projectTotal = (double) 0;
-                this.projectMax = (double) 0;
+                this.projectTotal = 0.0;
+                this.projectMax = 0.0;
             }
 
             this.projectTotal += weightageScore;
-            this.projectMax += maxWeightage;
+            if (maxWeightage != null) {
+                this.projectMax += maxWeightage;
+            }
             this.projectCredits = credits;
         }
     }

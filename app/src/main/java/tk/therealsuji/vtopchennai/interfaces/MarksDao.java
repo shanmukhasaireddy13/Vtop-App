@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import tk.therealsuji.vtopchennai.models.Course;
 import tk.therealsuji.vtopchennai.models.CumulativeMark;
@@ -67,5 +68,5 @@ public interface MarksDao {
     Single<List<Mark.AllData>> getMarks(String courseCode);
 
     @Query("SELECT * FROM cumulative_marks WHERE course_code = :courseCode")
-    Single<CumulativeMark> getCumulativeMark(String courseCode);
+    Maybe<CumulativeMark> getCumulativeMark(String courseCode);
 }
