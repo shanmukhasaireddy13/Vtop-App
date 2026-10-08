@@ -196,16 +196,7 @@ public class VTOPService extends Service {
             } else {
                 this.username = encryptedSharedPreferences.getString("username", null);
                 this.password = encryptedSharedPreferences.getString("password", null);
-
-                long lastRefreshed = this.sharedPreferences.getLong("lastRefreshed", 0);
-                long now = System.currentTimeMillis();
-                boolean canReuseSession = (now - lastRefreshed < 1200000) && CookieManager.getInstance().hasCookies();
-
-                if (canReuseSession) {
-                    this.reloadPage("/content", false);
-                } else {
-                    this.reloadPage("", false);
-                }
+                this.reloadPage("", false);
             }
         }
 
@@ -257,11 +248,42 @@ public class VTOPService extends Service {
             @Override
             public void onPageFinished(WebView view, String url) {
                 /*
-                 *  JSON response format
-                 *  {
-                 *      "page_type": "LANDING"|"HOME"|"LOGIN"|"BODY_NOT_READY"
-                 *  }
+                 *  Page detection: first check URL, then DOM.
+                 *  VTOP URLs:
+                 *    .../vtop          or .../vtop/   = LANDING (before student login click)
+                 *    .../vtop/login                   = LOGIN
+                 *    .../vtop/content or .../vtop/student/* = HOME
+                 *    .../vtop/prelogin/setup          = LANDING (redirect after form POST)
                  */
+
+                // Fast URL-based detection to avoid DOM race conditions
+                if (url != null) {
+                    String urlLower = url.toLowerCase();
+                    if (urlLower.contains("/vtop/login") || urlLower.contains("/vtop/signin")) {
+                        if (pageState != PageState.LOGIN) {
+                            getCaptchaType();
+                            pageState = PageState.LOGIN;
+                        }
+                        return;
+                    }
+                    if (urlLower.contains("/vtop/content") || urlLower.contains("/vtop/student")) {
+                        view.evaluateJavascript("(function() {" +
+                                "    var el = document.querySelector('input#authorizedIDX, input[name=\"authorizedID\"], #authorizedIDX');" +
+                                "    return el && el.value ? true : false;" +
+                                "})();", isAuth -> {
+                            if ("true".equals(isAuth)) {
+                                if (pageState != PageState.HOME) {
+                                    pageState = PageState.HOME;
+                                    getSemesters();
+                                }
+                            } else {
+                                reloadPage("", false);
+                            }
+                        });
+                        return;
+                    }
+                }
+
                 view.evaluateJavascript("(function() {" +
                         "try {" +
                         "    if (!document || !document.body || document.body.children.length === 0) {" +
@@ -479,32 +501,30 @@ public class VTOPService extends Service {
          */
         webView.evaluateJavascript("(function() {" +
                 "try {" +
-                "    var form = document.getElementById('stdForm') || document.querySelector('#stdForm, form[action*=\"prelogin\"]');" +
-                "    if (form) {" +
-                "        if (typeof submitForm === 'function') {" +
-                "            submitForm('stdForm');" +
-                "        } else {" +
-                "            form.submit();" +
-                "        }" +
-                "        return { success: true, method: 'submit' };" +
+                "    var form = document.getElementById('stdForm') || document.querySelector('form[action*=\"prelogin\"]');" +
+                "    if (!form) { return { success: false, error: 'no_form' }; }" +
+                "    var inputs = form.querySelectorAll('input');" +
+                "    var params = [];" +
+                "    for (var i = 0; i < inputs.length; i++) {" +
+                "        var inp = inputs[i];" +
+                "        if (inp.name) { params.push(encodeURIComponent(inp.name) + '=' + encodeURIComponent(inp.value)); }" +
                 "    }" +
-                "    var studentImg = document.getElementById('student') || document.querySelector('.cardStudent a, a[onclick*=\"stdForm\"]');" +
-                "    if (studentImg) {" +
-                "        studentImg.click();" +
-                "        return { success: true, method: 'click' };" +
-                "    }" +
-                "    return { success: false, error: 'Form not found' };" +
+                "    var body = params.join('&');" +
+                "    var action = form.getAttribute('action') || '/vtop/prelogin/setup';" +
+                "    if (action.charAt(0) !== '/') { action = '/' + action; }" +
+                "    var xhr = new XMLHttpRequest();" +
+                "    xhr.open('POST', action, false);" +
+                "    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');" +
+                "    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');" +
+                "    try { xhr.send(body); } catch(e) { return { success: false, error: 'xhr_failed: ' + e.toString() }; }" +
+                "    return { success: true, status: xhr.status };" +
                 "} catch(e) {" +
                 "    return { success: false, error: e.toString() };" +
                 "}" +
                 "})();", responseString -> {
             try {
-                if (responseString != null && !responseString.equals("null")) {
-                    JSONObject res = new JSONObject(responseString);
-                    if (!res.optBoolean("success", false)) {
-                        this.reloadPage("", false);
-                    }
-                }
+                // After the XHR setup POST, navigate directly to the login page
+                this.webView.post(() -> this.webView.loadUrl(SettingsRepository.VTOP_BASE_URL + "/login"));
             } catch (Exception e) {
                 error(103, e.getLocalizedMessage());
             }
@@ -862,12 +882,20 @@ public class VTOPService extends Service {
                     }
                 }
 
+                if (this.semesters.isEmpty()) {
+                    error(201, "No semesters found.");
+                    this.reloadPage("", false);
+                    return;
+                }
+
                 try {
                     this.notification.setContentTitle(getString(R.string.semester_wait));
                     this.notificationManager.notify(SettingsRepository.NOTIFICATION_ID_VTOP_DOWNLOAD, notification.build());
 
                     String[] semesters = this.semesters.keySet().toArray(new String[0]);
-                    this.callback.onRequestSemester(semesters);
+                    if (this.callback != null) {
+                        this.callback.onRequestSemester(semesters);
+                    }
                 } catch (Exception ignored) {
                     this.endService(true);
                 }
