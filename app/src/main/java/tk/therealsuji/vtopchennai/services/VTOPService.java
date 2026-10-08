@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Base64;
+import android.util.Log;
 import android.view.ViewGroup;
 import android.net.http.SslError;
 import android.os.Build;
@@ -88,6 +89,7 @@ public class VTOPService extends Service {
     public static final int CAPTCHA_GRECATPCHA = 2;
 
     private static final String END_SERVICE_ACTION = "END_SERVICE_ACTION";
+    private static final String TAG = "VTOP_DEBUG";
 
     AppDatabase appDatabase;
     ServiceBinder serviceBinder;
@@ -103,6 +105,7 @@ public class VTOPService extends Service {
     PageState pageState;
     SharedPreferences sharedPreferences;
     WebView webView;
+    private boolean isOpeningSignIn = false;
 
     Map<Integer, Course> theoryCourses, labCourses, projectCourses;
     Map<String, CumulativeMark> cumulativeMarks;
@@ -215,6 +218,9 @@ public class VTOPService extends Service {
     @SuppressLint("SetJavaScriptEnabled")
     private void createWebView() {
         String authorisedUserAgent = this.sharedPreferences.getString("authorisedUserAgent", null);
+        Log.d(TAG, "createWebView called, UA=" + authorisedUserAgent);
+
+        WebView.setWebContentsDebuggingEnabled(true);
 
         this.webView = new WebView(getApplicationContext());
         this.webView.addJavascriptInterface(this, "Android");
@@ -236,17 +242,25 @@ public class VTOPService extends Service {
         this.webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-                // Proceed on university certificate authority / captive portal SSL errors
+                Log.w(TAG, "onReceivedSslError: " + (error != null ? error.toString() : "null") + " -> proceeding");
                 handler.proceed();
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
+                Log.e(TAG, "onReceivedError: " + (error != null ? (error.getErrorCode() + ": " + error.getDescription()) : "unknown") + " url: " + (request != null ? request.getUrl() : ""));
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                Log.d(TAG, "onPageStarted: " + url);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                Log.d(TAG, "onPageFinished: " + url);
                 /*
                  *  Page detection: first check URL, then DOM.
                  *  VTOP URLs:
@@ -260,24 +274,43 @@ public class VTOPService extends Service {
                 if (url != null) {
                     String urlLower = url.toLowerCase();
                     if (urlLower.contains("/vtop/login") || urlLower.contains("/vtop/signin")) {
+                        Log.d(TAG, "Detected LOGIN URL: " + url);
                         if (pageState != PageState.LOGIN) {
-                            getCaptchaType();
                             pageState = PageState.LOGIN;
+                            getCaptchaType();
                         }
                         return;
                     }
                     if (urlLower.contains("/vtop/content") || urlLower.contains("/vtop/student")) {
+                        Log.d(TAG, "Detected CONTENT URL: " + url + ", checking authorization element");
                         view.evaluateJavascript("(function() {" +
                                 "    var el = document.querySelector('input#authorizedIDX, input[name=\"authorizedID\"], #authorizedIDX');" +
                                 "    return el && el.value ? true : false;" +
                                 "})();", isAuth -> {
+                            Log.d(TAG, "Content page isAuth=" + isAuth);
                             if ("true".equals(isAuth)) {
                                 if (pageState != PageState.HOME) {
                                     pageState = PageState.HOME;
                                     getSemesters();
                                 }
                             } else {
-                                reloadPage("", false);
+                                view.postDelayed(() -> {
+                                    view.evaluateJavascript("(function() {" +
+                                            "    var el = document.querySelector('input#authorizedIDX, input[name=\"authorizedID\"], #authorizedIDX');" +
+                                            "    return el && el.value ? true : false;" +
+                                            "})();", isAuthRetry -> {
+                                        Log.d(TAG, "Content page retry isAuth=" + isAuthRetry);
+                                        if ("true".equals(isAuthRetry)) {
+                                            if (pageState != PageState.HOME) {
+                                                pageState = PageState.HOME;
+                                                getSemesters();
+                                            }
+                                        } else {
+                                            Log.w(TAG, "Not authorized on content page, redirecting to landing");
+                                            reloadPage("", false);
+                                        }
+                                    });
+                                }, 500);
                             }
                         });
                         return;
@@ -298,7 +331,7 @@ public class VTOPService extends Service {
                         "    if (document.querySelector('#stdForm, form[name=\"stdForm\"], a[onclick*=\"submitForm\"], a[onclick*=\"stdForm\"], #student')) {" +
                         "        return { page_type: 'LANDING' };" +
                         "    }" +
-                        "    return { page_type: 'LANDING' };" +
+                        "    return { page_type: 'BODY_NOT_READY' };" +
                         "} catch(e) {" +
                         "    return { page_type: 'BODY_NOT_READY' };" +
                         "}" +
@@ -308,10 +341,15 @@ public class VTOPService extends Service {
                     }
                     try {
                         JSONObject response = new JSONObject(responseString);
-                        String pageType = response.optString("page_type", "LANDING");
+                        String pageType = response.optString("page_type", "BODY_NOT_READY");
 
                         switch (pageType) {
                             case "LANDING":
+                                if (pageState == PageState.LANDING) {
+                                    break;
+                                }
+                                pageState = PageState.LANDING;
+
                                 if (counter >= 10) {
                                     error(101, "Couldn't connect to the server.");
                                     endService(true);
@@ -320,27 +358,22 @@ public class VTOPService extends Service {
 
                                 openSignIn();
                                 ++counter;
-
-                                pageState = PageState.LANDING;
                                 break;
                             case "LOGIN":
                                 if (pageState == PageState.LOGIN) {
                                     break;
                                 }
-
-                                getCaptchaType();
                                 pageState = PageState.LOGIN;
+                                getCaptchaType();
                                 break;
                             case "HOME":
                                 if (pageState == PageState.HOME) {
                                     break;
                                 }
-
-                                getSemesters();
                                 pageState = PageState.HOME;
+                                getSemesters();
                                 break;
                             case "BODY_NOT_READY":
-                                break;
                             default:
                                 break;
                         }
@@ -436,6 +469,8 @@ public class VTOPService extends Service {
 
         this.pageState = null;
         this.progress = -1;
+        this.counter = 0;
+        this.isOpeningSignIn = false;
 
         this.notification.setContentTitle(getString(R.string.server_connect));
         this.notification.setContentText(null);
@@ -458,6 +493,7 @@ public class VTOPService extends Service {
                 targetUrl += path;
             }
         }
+        Log.d(TAG, "reloadPage: targetUrl=" + targetUrl + " destroySession=" + destroySession);
         this.webView.loadUrl(targetUrl);
     }
 
@@ -481,6 +517,7 @@ public class VTOPService extends Service {
      * Function to handle errors.
      */
     private void error(final int errorCode, final String errorMessage) {
+        Log.e(TAG, "error: code=" + errorCode + " msg=" + errorMessage);
         Toast.makeText(getApplicationContext(), "Error " + errorCode + ". " + errorMessage, Toast.LENGTH_SHORT).show();
         this.reloadPage("", true);
 
@@ -490,43 +527,48 @@ public class VTOPService extends Service {
     }
 
     /**
-     * Function to open the login page.
+     * Function to open the login page by submitting the student form natively in WebView.
      */
     private void openSignIn() {
-        /*
-         *  JSON response format
-         *  {
-         *      "success": true|false
-         *  }
-         */
+        if (isOpeningSignIn) {
+            Log.d(TAG, "openSignIn already in progress, skipping duplicate");
+            return;
+        }
+        isOpeningSignIn = true;
+        Log.d(TAG, "openSignIn started: submitting stdForm natively");
         webView.evaluateJavascript("(function() {" +
                 "try {" +
-                "    var form = document.getElementById('stdForm') || document.querySelector('form[action*=\"prelogin\"]');" +
-                "    if (!form) { return { success: false, error: 'no_form' }; }" +
-                "    var inputs = form.querySelectorAll('input');" +
-                "    var params = [];" +
-                "    for (var i = 0; i < inputs.length; i++) {" +
-                "        var inp = inputs[i];" +
-                "        if (inp.name) { params.push(encodeURIComponent(inp.name) + '=' + encodeURIComponent(inp.value)); }" +
+                "    if (typeof submitForm === 'function') {" +
+                "        submitForm('stdForm');" +
+                "        return { success: true, method: 'submitForm' };" +
                 "    }" +
-                "    var body = params.join('&');" +
-                "    var action = form.getAttribute('action') || '/vtop/prelogin/setup';" +
-                "    if (action.charAt(0) !== '/') { action = '/' + action; }" +
-                "    var xhr = new XMLHttpRequest();" +
-                "    xhr.open('POST', action, false);" +
-                "    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');" +
-                "    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');" +
-                "    try { xhr.send(body); } catch(e) { return { success: false, error: 'xhr_failed: ' + e.toString() }; }" +
-                "    return { success: true, status: xhr.status };" +
+                "    var form = document.getElementById('stdForm') || document.querySelector('form[action*=\"prelogin\"]');" +
+                "    if (form) {" +
+                "        form.submit();" +
+                "        return { success: true, method: 'form.submit' };" +
+                "    }" +
+                "    var studentBtn = document.getElementById('student') || document.querySelector('.cardStudent a, a[onclick*=\"stdForm\"]');" +
+                "    if (studentBtn) {" +
+                "        studentBtn.click();" +
+                "        return { success: true, method: 'click' };" +
+                "    }" +
+                "    return { success: false, error: 'no_stdForm' };" +
                 "} catch(e) {" +
                 "    return { success: false, error: e.toString() };" +
                 "}" +
                 "})();", responseString -> {
+            Log.d(TAG, "openSignIn JS result: " + responseString);
             try {
-                // After the XHR setup POST, navigate directly to the login page
-                this.webView.post(() -> this.webView.loadUrl(SettingsRepository.VTOP_BASE_URL + "/login"));
+                if (responseString != null && !responseString.equals("null")) {
+                    JSONObject obj = new JSONObject(responseString);
+                    if (!obj.optBoolean("success", false)) {
+                        isOpeningSignIn = false;
+                        Log.w(TAG, "openSignIn returned success=false: " + obj.optString("error"));
+                    }
+                }
             } catch (Exception e) {
-                error(103, e.getLocalizedMessage());
+                isOpeningSignIn = false;
+                Log.w(TAG, "openSignIn parsing failed: " + e.getMessage());
             }
         });
     }
@@ -535,6 +577,7 @@ public class VTOPService extends Service {
      * Function to get the type of captcha (Default Captcha / Google reCaptcha).
      */
     private void getCaptchaType() {
+        Log.d(TAG, "getCaptchaType started");
         /*
          *  JSON response format
          *
@@ -652,6 +695,7 @@ public class VTOPService extends Service {
      */
     @JavascriptInterface
     public void signIn(final String captcha) {
+        Log.d(TAG, "signIn called with captcha length=" + (captcha != null ? captcha.length() : 0));
         this.notification.setContentTitle(getString(R.string.sign_in_attempt));
         this.notificationManager.notify(SettingsRepository.NOTIFICATION_ID_VTOP_DOWNLOAD, notification.build());
 
@@ -801,6 +845,7 @@ public class VTOPService extends Service {
      * Function to get a list of the semesters. These semesters are obtained from the Timetable page.
      */
     private void getSemesters() {
+        Log.d(TAG, "getSemesters started");
         /*
          *  JSON response format
          *
@@ -857,6 +902,7 @@ public class VTOPService extends Service {
                 "}" +
                 "return response;" +
                 "})();", responseString -> {
+            Log.d(TAG, "getSemesters JS result: " + responseString);
             if (responseString == null || responseString.equals("null") || responseString.trim().isEmpty()) {
                 error(201, "Empty response from server.");
                 return;

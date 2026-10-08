@@ -375,6 +375,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        if (getIntent() != null && getIntent().getBooleanExtra("triggerSync", false)) {
+            syncData();
+        }
+
         // Request for notification permissions on android 33 and above
         if (!SettingsRepository.hasNotificationPermission(this)) {
             requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
@@ -452,6 +456,15 @@ public class MainActivity extends AppCompatActivity {
 
         if (this.bottomNavigationView.getTranslationY() != 0) {
             this.hideBottomNavigationView();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra("triggerSync", false)) {
+            syncData();
         }
     }
 
