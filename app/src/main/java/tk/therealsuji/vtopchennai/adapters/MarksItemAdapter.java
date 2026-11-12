@@ -96,24 +96,54 @@ public class MarksItemAdapter extends RecyclerView.Adapter<MarksItemAdapter.View
                 markTitle.getOverlay().clear();
             }
 
-            if (marksItem.score != null && marksItem.maxScore != null && marksItem.weightage != null && marksItem.maxWeightage != null) {
-                String markTypeScore = this.marksItem.getContext().getString(R.string.score);
-                String score = new DecimalFormat("#.#").format(marksItem.score) + "/" + new DecimalFormat("#.#").format(marksItem.maxScore);
-                String weightage = new DecimalFormat("#.#").format(marksItem.weightage) + "/" + new DecimalFormat("#.#").format(marksItem.maxWeightage);
+            DecimalFormat df = new DecimalFormat("#.##");
+            String markTypeScore = this.marksItem.getContext().getString(R.string.score);
+            String markTypeWeightage = this.marksItem.getContext().getString(R.string.weightage);
 
-                scoreText.setText(score);
-                scoreProgress.setProgress(marksItem.score.intValue());
-                scoreProgress.setMax(marksItem.maxScore.intValue());
+            Double primaryScore = marksItem.score != null ? marksItem.score : marksItem.weightage;
+            Double primaryMax = marksItem.maxScore != null ? marksItem.maxScore : marksItem.maxWeightage;
+            Double altScore = marksItem.weightage != null ? marksItem.weightage : marksItem.score;
+            Double altMax = marksItem.maxWeightage != null ? marksItem.maxWeightage : marksItem.maxScore;
+
+            if (primaryScore != null) {
+                String scoreFormatted = df.format(primaryScore) + (primaryMax != null ? "/" + df.format(primaryMax) : "");
+                String weightageFormatted = (altScore != null) ? (df.format(altScore) + (altMax != null ? "/" + df.format(altMax) : "")) : scoreFormatted;
+
+                scoreText.setText(scoreFormatted);
+                markType.setText(R.string.score);
+
+                int maxInt = (primaryMax != null && primaryMax > 0) ? primaryMax.intValue() : 100;
+                scoreProgress.setMax(maxInt);
+                scoreProgress.setProgress(primaryScore.intValue());
 
                 scoreText.setOnClickListener(view -> {
-                    if (markType.getText().equals(markTypeScore)) {
-                        scoreText.setText(weightage);
+                    if (markType.getText().toString().equals(markTypeScore)) {
+                        scoreText.setText(weightageFormatted);
                         markType.setText(R.string.weightage);
+                        if (altMax != null && altMax > 0) {
+                            scoreProgress.setMax(altMax.intValue());
+                        }
+                        if (altScore != null) {
+                            scoreProgress.setProgress(altScore.intValue());
+                        }
                     } else {
-                        scoreText.setText(score);
+                        scoreText.setText(scoreFormatted);
                         markType.setText(R.string.score);
+                        scoreProgress.setMax(maxInt);
+                        scoreProgress.setProgress(primaryScore.intValue());
                     }
                 });
+            } else {
+                String pendingDisplay = (primaryMax != null) ? ("-/" + df.format(primaryMax)) : "-";
+                scoreText.setText(pendingDisplay);
+                markType.setText(R.string.score);
+                scoreProgress.setProgress(0);
+                if (primaryMax != null && primaryMax > 0) {
+                    scoreProgress.setMax(primaryMax.intValue());
+                } else {
+                    scoreProgress.setMax(100);
+                }
+                scoreText.setOnClickListener(null);
             }
 
             if (marksItem.average != null) {

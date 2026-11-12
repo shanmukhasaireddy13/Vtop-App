@@ -1887,50 +1887,97 @@ public class VTOPService extends Service {
                 "                    }" +
                 "                }" +
                 "                if (!innerTable) continue;" +
-                "                var innerHeadings = innerTable.querySelectorAll('th');" +
-                "                if (!innerHeadings || innerHeadings.length === 0) {" +
-                "                    var firstInnerRow = innerTable.rows[0];" +
-                "                    if (firstInnerRow) innerHeadings = firstInnerRow.querySelectorAll('td');" +
+                "                var headerRow = null;" +
+                "                for (var hr = 0; hr < innerTable.rows.length; ++hr) {" +
+                "                    var rText = (innerTable.rows[hr].innerText || '').toLowerCase();" +
+                "                    if ((rText.includes('title') || rText.includes('component') || rText.includes('assessment')) && (rText.includes('mark') || rText.includes('score') || rText.includes('max') || rText.includes('weightage'))) {" +
+                "                        headerRow = innerTable.rows[hr];" +
+                "                        break;" +
+                "                    }" +
                 "                }" +
+                "                if (!headerRow && innerTable.rows.length > 0) {" +
+                "                    headerRow = innerTable.rows[0];" +
+                "                }" +
+                "                if (!headerRow) continue;" +
+                "                var innerHeadings = headerRow.cells || headerRow.children;" +
                 "                var titleIndex = -1, scoreIndex = -1, maxScoreIndex = -1, weightageIndex = -1, maxWeightageIndex = -1, averageIndex = -1, statusIndex = -1;" +
                 "                for (var j = 0; j < innerHeadings.length; ++j) {" +
                 "                    var hText = (innerHeadings[j].innerText || '').toLowerCase().trim();" +
+                "                    if (hText.includes('remark')) {" +
+                "                        continue;" +
+                "                    }" +
                 "                    if (hText.includes('title') || hText.includes('component') || hText.includes('assessment')) {" +
                 "                        titleIndex = j;" +
                 "                    } else if (hText.includes('status')) {" +
                 "                        statusIndex = j;" +
-                "                    } else if (hText.includes('average')) {" +
+                "                    } else if (hText.includes('average') || hText.includes('avg')) {" +
                 "                        averageIndex = j;" +
-                "                    } else if (hText.includes('weightage') && (hText.includes('mark') || hText.includes('scored'))) {" +
+                "                    } else if (hText.includes('weightage') && (hText.includes('mark') || hText.includes('scored') || hText.includes('score'))) {" +
                 "                        weightageIndex = j;" +
-                "                    } else if (hText.includes('scored') || (hText.includes('mark') && !hText.includes('max') && !hText.includes('weightage'))) {" +
+                "                    } else if (hText.includes('scored') || hText.includes('obtained') || (hText.includes('mark') && !hText.includes('max') && !hText.includes('weightage')) || (hText.includes('score') && !hText.includes('max') && !hText.includes('weightage'))) {" +
                 "                        scoreIndex = j;" +
-                "                    } else if (hText.includes('max') && (hText.includes('%') || hText.includes('weightage'))) {" +
+                "                    } else if ((hText.includes('max') || hText.includes('maximum')) && (hText.includes('%') || hText.includes('weightage'))) {" +
                 "                        maxWeightageIndex = j;" +
-                "                    } else if (hText.includes('%') || (hText.includes('weightage') && !hText.includes('mark'))) {" +
+                "                    } else if (hText.includes('%') || (hText.includes('weightage') && !hText.includes('mark') && !hText.includes('scored'))) {" +
                 "                        maxWeightageIndex = j;" +
-                "                    } else if (hText.includes('max')) {" +
+                "                    } else if (hText.includes('max') || hText.includes('maximum')) {" +
                 "                        maxScoreIndex = j;" +
                 "                    }" +
                 "                }" +
                 "                if (scoreIndex === -1 && weightageIndex >= 0) {" +
                 "                    scoreIndex = weightageIndex;" +
                 "                }" +
+                "                if (weightageIndex === -1 && scoreIndex >= 0) {" +
+                "                    weightageIndex = scoreIndex;" +
+                "                }" +
+                "                if (maxScoreIndex === -1 && maxWeightageIndex >= 0) {" +
+                "                    maxScoreIndex = maxWeightageIndex;" +
+                "                }" +
+                "                if (maxWeightageIndex === -1 && maxScoreIndex >= 0) {" +
+                "                    maxWeightageIndex = maxScoreIndex;" +
+                "                }" +
+                "                var parseCellNumber = function(cell) {" +
+                "                    if (!cell) return null;" +
+                "                    var txt = (cell.innerText || '').trim();" +
+                "                    if (!txt || txt === '-' || txt === '--' || txt.toLowerCase() === 'n/a' || txt.toLowerCase() === 'absent' || txt.toLowerCase() === 'null') {" +
+                "                        return null;" +
+                "                    }" +
+                "                    var match = txt.match(/[-+]?[0-9]*\\.?[0-9]+/);" +
+                "                    if (!match) return null;" +
+                "                    var val = parseFloat(match[0]);" +
+                "                    return isNaN(val) ? null : val;" +
+                "                };" +
                 "                for (var ir = 0; ir < innerTable.rows.length; ++ir) {" +
                 "                    var innerRow = innerTable.rows[ir];" +
-                "                    var innerRowCells = innerRow.querySelectorAll('td');" +
+                "                    if (innerRow === headerRow) continue;" +
+                "                    var innerRowCells = innerRow.cells || innerRow.children;" +
                 "                    if (!innerRowCells || innerRowCells.length === 0) continue;" +
-                "                    if (ir === 0 && (innerRow.innerText.toLowerCase().includes('title') || innerRow.innerText.toLowerCase().includes('max'))) {" +
+                "                    var rowTxt = (innerRow.innerText || '').toLowerCase();" +
+                "                    if (rowTxt.includes('mark title') || (rowTxt.includes('title') && rowTxt.includes('max')) || rowTxt.includes('no data found')) {" +
                 "                        continue;" +
                 "                    }" +
                 "                    var markTitle = (titleIndex >= 0 && titleIndex < innerRowCells.length) ? (innerRowCells[titleIndex].innerText || '').trim() : '';" +
                 "                    if (!markTitle) continue;" +
-                "                    var score = (scoreIndex >= 0 && scoreIndex < innerRowCells.length) ? (parseFloat(innerRowCells[scoreIndex].innerText) || 0) : 0;" +
-                "                    var maxScore = (maxScoreIndex >= 0 && maxScoreIndex < innerRowCells.length) ? (parseFloat(innerRowCells[maxScoreIndex].innerText) || null) : null;" +
-                "                    var weightage = (weightageIndex >= 0 && weightageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[weightageIndex].innerText) || 0) : 0;" +
-                "                    var maxWeightage = (maxWeightageIndex >= 0 && maxWeightageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[maxWeightageIndex].innerText) || null) : null;" +
-                "                    var average = (averageIndex >= 0 && averageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[averageIndex].innerText) || null) : null;" +
+                "                    var score = (scoreIndex >= 0 && scoreIndex < innerRowCells.length) ? parseCellNumber(innerRowCells[scoreIndex]) : null;" +
+                "                    var maxScore = (maxScoreIndex >= 0 && maxScoreIndex < innerRowCells.length) ? parseCellNumber(innerRowCells[maxScoreIndex]) : null;" +
+                "                    var weightage = (weightageIndex >= 0 && weightageIndex < innerRowCells.length) ? parseCellNumber(innerRowCells[weightageIndex]) : null;" +
+                "                    var maxWeightage = (maxWeightageIndex >= 0 && maxWeightageIndex < innerRowCells.length) ? parseCellNumber(innerRowCells[maxWeightageIndex]) : null;" +
+                "                    var average = (averageIndex >= 0 && averageIndex < innerRowCells.length) ? parseCellNumber(innerRowCells[averageIndex]) : null;" +
                 "                    var status = (statusIndex >= 0 && statusIndex < innerRowCells.length) ? (innerRowCells[statusIndex].innerText || '').trim() : '';" +
+                "                    if (score === null && weightage !== null && maxWeightage && maxScore && maxWeightage > 0) {" +
+                "                        score = Math.round((weightage * maxScore / maxWeightage) * 100) / 100;" +
+                "                    }" +
+                "                    if (weightage === null && score !== null && maxScore && maxWeightage && maxScore > 0) {" +
+                "                        weightage = Math.round((score * maxWeightage / maxScore) * 100) / 100;" +
+                "                    }" +
+                "                    if (score === null && weightage !== null) {" +
+                "                        score = weightage;" +
+                "                        if (maxScore === null) maxScore = maxWeightage;" +
+                "                    }" +
+                "                    if (weightage === null && score !== null) {" +
+                "                        weightage = score;" +
+                "                        if (maxWeightage === null) maxWeightage = maxScore;" +
+                "                    }" +
                 "                    response.marks.push({" +
                 "                        course_code: rawCourseCode," +
                 "                        slot: slot," +
@@ -2005,7 +2052,9 @@ public class VTOPService extends Service {
                         CumulativeMark cm = this.cumulativeMarks.get(courseCode);
                         if (cm != null) {
                             cm.courseCode = courseCode;
-                            cm.addWeightage(mark.weightage, mark.maxWeightage, courseType, courseCredits);
+                            Double w = mark.weightage != null ? mark.weightage : mark.score;
+                            Double mw = mark.maxWeightage != null ? mark.maxWeightage : mark.maxScore;
+                            cm.addWeightage(w, mw, courseType, courseCredits);
                         }
                     }
 

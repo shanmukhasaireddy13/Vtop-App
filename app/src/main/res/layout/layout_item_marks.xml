@@ -82,6 +82,7 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="10dp"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="17sp"
                 android:textStyle="bold" />
 
