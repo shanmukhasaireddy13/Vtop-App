@@ -157,12 +157,42 @@ public class PerformanceCard extends LinearLayout {
         }
     }
 
+    private void ensureDefaultValues() {
+        if (!this.defaultValues.has("cardWidth")) {
+            float pixelDensity = getContext().getResources().getDisplayMetrics().density;
+            int width = getMeasuredWidth();
+            if (width <= 0 && getLayoutParams() != null) {
+                width = getLayoutParams().width;
+            }
+            if (width <= 0) {
+                width = (int) (140 * pixelDensity);
+            }
+            int marginStart = (int) (10 * pixelDensity);
+            int marginEnd = (int) (10 * pixelDensity);
+            if (getLayoutParams() instanceof LayoutParams) {
+                LayoutParams mlp = (LayoutParams) getLayoutParams();
+                if (mlp.getMarginStart() > 0) marginStart = mlp.getMarginStart();
+                if (mlp.getMarginEnd() > 0) marginEnd = mlp.getMarginEnd();
+            }
+            try {
+                this.defaultValues.put("cardWidth", width);
+                this.defaultValues.put("marginStart", marginStart);
+                this.defaultValues.put("marginEnd", marginEnd);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     public void show() {
         this.clearAnimation();
         this.post(() -> {
             try {
+                ensureDefaultValues();
                 LinearLayout card = this;
-                int cardWidth = this.defaultValues.getInt("cardWidth");
+                int cardWidth = this.defaultValues.optInt("cardWidth", (int) (140 * getContext().getResources().getDisplayMetrics().density));
+                if (cardWidth <= 0) {
+                    cardWidth = (int) (140 * getContext().getResources().getDisplayMetrics().density);
+                }
 
                 ResizeAnimation expandAnimation = new ResizeAnimation(card, ResizeAnimation.DIRECTION_X, cardWidth, this.defaultValues);
                 AlphaAnimation alphaAnimation = new AlphaAnimation(card, 1);
@@ -185,6 +215,8 @@ public class PerformanceCard extends LinearLayout {
                 card.setVisibility(VISIBLE);
                 card.startAnimation(expandAnimation);
             } catch (Exception ignored) {
+                this.setVisibility(VISIBLE);
+                this.setAlpha(1f);
             }
         });
     }
@@ -193,15 +225,8 @@ public class PerformanceCard extends LinearLayout {
         this.clearAnimation();
         this.post(() -> {
             try {
+                ensureDefaultValues();
                 LinearLayout card = this;
-
-                if (!this.defaultValues.has("cardWidth")) {
-                    LayoutParams layoutParams = (LayoutParams) card.getLayoutParams();
-
-                    this.defaultValues.put("cardWidth", card.getMeasuredWidth());
-                    this.defaultValues.put("marginStart", layoutParams.getMarginStart());
-                    this.defaultValues.put("marginEnd", layoutParams.getMarginEnd());
-                }
 
                 ResizeAnimation compressAnimation = new ResizeAnimation(card, ResizeAnimation.DIRECTION_X, 0, this.defaultValues);
                 AlphaAnimation alphaAnimation = new AlphaAnimation(card, 0);
@@ -224,6 +249,7 @@ public class PerformanceCard extends LinearLayout {
 
                 card.startAnimation(alphaAnimation);
             } catch (Exception ignored) {
+                this.setVisibility(INVISIBLE);
             }
 
         });

@@ -1831,76 +1831,118 @@ public class VTOPService extends Service {
                 "                return;" +
                 "            }" +
                 "            var doc = new DOMParser().parseFromString(res, 'text/html');" +
-                "            var table = doc.getElementById('fixedTableContainer') || doc.getElementsByTagName('table')[0];" +
-                "            if (!table) return;" +
-                "            var rows = table.getElementsByTagName('tr');" +
-                "            if (!rows || rows.length === 0) return;" +
-                "            var headings = rows[0].getElementsByTagName('td');" +
-                "            if (!headings || headings.length === 0) headings = rows[0].getElementsByTagName('th');" +
+                "            var container = doc.getElementById('fixedTableContainer');" +
+                "            var mainTable = (container && container.tagName && container.tagName.toLowerCase() === 'table') ? container : (container ? container.querySelector('table') : null) || doc.querySelector('table');" +
+                "            if (!mainTable) return;" +
+                "            var allOuterRows = mainTable.rows;" +
+                "            if (!allOuterRows || allOuterRows.length === 0) return;" +
+                "            var headerRow = allOuterRows[0];" +
+                "            var headings = headerRow.querySelectorAll('th');" +
+                "            if (!headings || headings.length === 0) headings = headerRow.querySelectorAll('td');" +
                 "            if (!headings || headings.length === 0) return;" +
-                "            var courseTypeIndex = -1, slotIndex = -1;" +
+                "            var courseCodeIndex = -1, courseTypeIndex = -1, slotIndex = -1;" +
                 "            for (var i = 0; i < headings.length; ++i) {" +
-                "                var heading = (headings[i].innerText || '').toLowerCase();" +
-                "                if (heading.includes('course') && heading.includes('type')) {" +
+                "                var heading = (headings[i].innerText || '').toLowerCase().trim();" +
+                "                if (heading.includes('code')) {" +
+                "                    courseCodeIndex = i;" +
+                "                } else if (heading.includes('course') && heading.includes('type')) {" +
                 "                    courseTypeIndex = i;" +
                 "                } else if (heading.includes('slot')) {" +
                 "                    slotIndex = i;" +
                 "                }" +
                 "            }" +
-                "            for (var i = 1; i < rows.length; ++i) {" +
-                "                var rowCells = rows[i].getElementsByTagName('td');" +
-                "                if (!rowCells || rowCells.length <= Math.max(courseTypeIndex, slotIndex)) continue;" +
-                "                var rawCourseType = courseTypeIndex >= 0 ? (rowCells[courseTypeIndex].innerText || '').trim().toLowerCase() : '';" +
-                "                var courseType = (rawCourseType.includes('lab')) ? 'lab' : ((rawCourseType.includes('project')) ? 'project' : 'theory');" +
-                "                var slot = slotIndex >= 0 ? (rowCells[slotIndex].innerText || '').split('+')[0].trim() : '';" +
-                "                var nextRow = rows[++i];" +
-                "                if (!nextRow) break;" +
-                "                var innerTable = nextRow.getElementsByTagName('table')[0];" +
-                "                if (!innerTable) continue;" +
-                "                var innerRows = innerTable.getElementsByTagName('tr');" +
-                "                if (!innerRows || innerRows.length === 0) continue;" +
-                "                var innerHeadings = innerRows[0].getElementsByTagName('td');" +
-                "                if (!innerHeadings || innerHeadings.length === 0) innerHeadings = innerRows[0].getElementsByTagName('th');" +
-                "                if (!innerHeadings || innerHeadings.length === 0) continue;" +
-                "                var titleIndex = -1, scoreIndex = -1, maxScoreIndex = -1, weightageIndex = -1, maxWeightageIndex = -1, averageIndex = -1, statusIndex = -1;" +
-                "                for (var j = 0; j < innerHeadings.length; ++j) {" +
-                "                    var innerHeading = (innerHeadings[j].innerText || '').toLowerCase();" +
-                "                    if (innerHeading.includes('title')) {" +
-                "                        titleIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('max')) {" +
-                "                        maxScoreIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('%')) {" +
-                "                        maxWeightageIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('status')) {" +
-                "                        statusIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('scored')) {" +
-                "                        scoreIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('weightage') && innerHeading.includes('mark')) {" +
-                "                        weightageIndex = j + innerHeadings.length;" +
-                "                    } else if (innerHeading.includes('average')) {" +
-                "                        averageIndex = j + innerHeadings.length;" +
+                "            for (var r = 0; r < allOuterRows.length; ++r) {" +
+                "                var row = allOuterRows[r];" +
+                "                var cells = row.querySelectorAll('td');" +
+                "                if (!cells || cells.length === 0) continue;" +
+                "                if (cells.length < 3 && row.querySelector('table')) {" +
+                "                    continue;" +
+                "                }" +
+                "                var rawCourseCode = (courseCodeIndex >= 0 && courseCodeIndex < cells.length) ? (cells[courseCodeIndex].innerText || '').trim() : '';" +
+                "                if (!rawCourseCode) {" +
+                "                    for (var c = 0; c < cells.length; ++c) {" +
+                "                        var txt = (cells[c].innerText || '').trim();" +
+                "                        if (/^[A-Z]{2,4}\\d{2,4}[A-Z]?$/i.test(txt)) {" +
+                "                            rawCourseCode = txt;" +
+                "                            break;" +
+                "                        }" +
                 "                    }" +
                 "                }" +
-                "                var innerCells = innerTable.getElementsByTagName('td');" +
-                "                while(titleIndex >= 0 && titleIndex < innerCells.length && scoreIndex >= 0 && scoreIndex < innerCells.length && maxScoreIndex >= 0 && maxScoreIndex < innerCells.length && weightageIndex >= 0 && weightageIndex < innerCells.length && maxWeightageIndex >= 0 && maxWeightageIndex < innerCells.length && averageIndex >= 0 && averageIndex < innerCells.length && statusIndex >= 0 && statusIndex < innerCells.length) {" +
-                "                    var mark = {};" +
-                "                    mark.slot = slot;" +
-                "                    mark.course_type = courseType;" +
-                "                    mark.title = (innerCells[titleIndex].innerText || '').trim();" +
-                "                    mark.score = parseFloat(innerCells[scoreIndex].innerText) || 0;" +
-                "                    mark.max_score = parseFloat(innerCells[maxScoreIndex].innerText) || null;" +
-                "                    mark.weightage = parseFloat(innerCells[weightageIndex].innerText) || 0;" +
-                "                    mark.max_weightage = parseFloat(innerCells[maxWeightageIndex].innerText) || null;" +
-                "                    mark.average = parseFloat(innerCells[averageIndex].innerText) || null;" +
-                "                    mark.status = (innerCells[statusIndex].innerText || '').trim();" +
-                "                    response.marks.push(mark);" +
-                "                    titleIndex += innerHeadings.length;" +
-                "                    scoreIndex += innerHeadings.length;" +
-                "                    maxScoreIndex += innerHeadings.length;" +
-                "                    weightageIndex += innerHeadings.length;" +
-                "                    maxWeightageIndex += innerHeadings.length;" +
-                "                    averageIndex += innerHeadings.length;" +
-                "                    statusIndex += innerHeadings.length;" +
+                "                var rawCourseType = (courseTypeIndex >= 0 && courseTypeIndex < cells.length) ? (cells[courseTypeIndex].innerText || '').trim().toLowerCase() : '';" +
+                "                var courseType = rawCourseType.includes('lab') ? 'lab' : (rawCourseType.includes('project') ? 'project' : 'theory');" +
+                "                var slot = (slotIndex >= 0 && slotIndex < cells.length) ? (cells[slotIndex].innerText || '').split('+')[0].trim() : '';" +
+                "                var innerTable = row.querySelector('table');" +
+                "                if (!innerTable) {" +
+                "                    for (var nextR = r + 1; nextR < allOuterRows.length; ++nextR) {" +
+                "                        var nextRow = allOuterRows[nextR];" +
+                "                        var tbl = nextRow.querySelector('table');" +
+                "                        if (tbl) {" +
+                "                            innerTable = tbl;" +
+                "                            break;" +
+                "                        }" +
+                "                        var nextCells = nextRow.querySelectorAll('td');" +
+                "                        if (nextCells.length >= 4) {" +
+                "                            break;" +
+                "                        }" +
+                "                    }" +
+                "                }" +
+                "                if (!innerTable) continue;" +
+                "                var innerHeadings = innerTable.querySelectorAll('th');" +
+                "                if (!innerHeadings || innerHeadings.length === 0) {" +
+                "                    var firstInnerRow = innerTable.rows[0];" +
+                "                    if (firstInnerRow) innerHeadings = firstInnerRow.querySelectorAll('td');" +
+                "                }" +
+                "                var titleIndex = -1, scoreIndex = -1, maxScoreIndex = -1, weightageIndex = -1, maxWeightageIndex = -1, averageIndex = -1, statusIndex = -1;" +
+                "                for (var j = 0; j < innerHeadings.length; ++j) {" +
+                "                    var hText = (innerHeadings[j].innerText || '').toLowerCase().trim();" +
+                "                    if (hText.includes('title') || hText.includes('component') || hText.includes('assessment')) {" +
+                "                        titleIndex = j;" +
+                "                    } else if (hText.includes('status')) {" +
+                "                        statusIndex = j;" +
+                "                    } else if (hText.includes('average')) {" +
+                "                        averageIndex = j;" +
+                "                    } else if (hText.includes('weightage') && (hText.includes('mark') || hText.includes('scored'))) {" +
+                "                        weightageIndex = j;" +
+                "                    } else if (hText.includes('scored') || (hText.includes('mark') && !hText.includes('max') && !hText.includes('weightage'))) {" +
+                "                        scoreIndex = j;" +
+                "                    } else if (hText.includes('max') && (hText.includes('%') || hText.includes('weightage'))) {" +
+                "                        maxWeightageIndex = j;" +
+                "                    } else if (hText.includes('%') || (hText.includes('weightage') && !hText.includes('mark'))) {" +
+                "                        maxWeightageIndex = j;" +
+                "                    } else if (hText.includes('max')) {" +
+                "                        maxScoreIndex = j;" +
+                "                    }" +
+                "                }" +
+                "                if (scoreIndex === -1 && weightageIndex >= 0) {" +
+                "                    scoreIndex = weightageIndex;" +
+                "                }" +
+                "                for (var ir = 0; ir < innerTable.rows.length; ++ir) {" +
+                "                    var innerRow = innerTable.rows[ir];" +
+                "                    var innerRowCells = innerRow.querySelectorAll('td');" +
+                "                    if (!innerRowCells || innerRowCells.length === 0) continue;" +
+                "                    if (ir === 0 && (innerRow.innerText.toLowerCase().includes('title') || innerRow.innerText.toLowerCase().includes('max'))) {" +
+                "                        continue;" +
+                "                    }" +
+                "                    var markTitle = (titleIndex >= 0 && titleIndex < innerRowCells.length) ? (innerRowCells[titleIndex].innerText || '').trim() : '';" +
+                "                    if (!markTitle) continue;" +
+                "                    var score = (scoreIndex >= 0 && scoreIndex < innerRowCells.length) ? (parseFloat(innerRowCells[scoreIndex].innerText) || 0) : 0;" +
+                "                    var maxScore = (maxScoreIndex >= 0 && maxScoreIndex < innerRowCells.length) ? (parseFloat(innerRowCells[maxScoreIndex].innerText) || null) : null;" +
+                "                    var weightage = (weightageIndex >= 0 && weightageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[weightageIndex].innerText) || 0) : 0;" +
+                "                    var maxWeightage = (maxWeightageIndex >= 0 && maxWeightageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[maxWeightageIndex].innerText) || null) : null;" +
+                "                    var average = (averageIndex >= 0 && averageIndex < innerRowCells.length) ? (parseFloat(innerRowCells[averageIndex].innerText) || null) : null;" +
+                "                    var status = (statusIndex >= 0 && statusIndex < innerRowCells.length) ? (innerRowCells[statusIndex].innerText || '').trim() : '';" +
+                "                    response.marks.push({" +
+                "                        course_code: rawCourseCode," +
+                "                        slot: slot," +
+                "                        course_type: courseType," +
+                "                        title: markTitle," +
+                "                        score: score," +
+                "                        max_score: maxScore," +
+                "                        weightage: weightage," +
+                "                        max_weightage: maxWeightage," +
+                "                        average: average," +
+                "                        status: status" +
+                "                    });" +
                 "                }" +
                 "            }" +
                 "        }" +
@@ -1937,8 +1979,11 @@ public class VTOPService extends Service {
                         courseType = Course.TYPE_PROJECT;
                     }
 
+                    String courseCode = this.getStringValue(markObject, "course_code");
+                    String slot = markObject.optString("slot", "");
+
                     mark.id = i + 1;
-                    mark.courseId = this.getCourseId(markObject.optString("slot"), courseType);
+                    mark.courseId = this.findCourseId(courseCode, slot, courseType);
                     mark.title = this.getStringValue(markObject, "title");
                     mark.score = this.getDoubleValue(markObject, "score");
                     mark.maxScore = this.getDoubleValue(markObject, "max_score");
@@ -1947,8 +1992,10 @@ public class VTOPService extends Service {
                     mark.average = this.getDoubleValue(markObject, "average");
                     mark.status = this.getStringValue(markObject, "status");
 
-                    String courseCode = this.getCourseCode(mark.courseId, courseType);
-                    Integer courseCredits = this.getCourseCredits(mark.courseId, courseType);
+                    if (courseCode == null && mark.courseId != null) {
+                        courseCode = this.getCourseCode(mark.courseId, courseType);
+                    }
+                    Integer courseCredits = this.findCourseCredits(mark.courseId, courseCode, courseType);
 
                     if (courseCode != null) {
                         if (!this.cumulativeMarks.containsKey(courseCode)) {
@@ -2074,32 +2121,27 @@ public class VTOPService extends Service {
                 "            var headings = table.getElementsByTagName('th');" +
                 "            if (!headings || headings.length === 0) headings = table.getElementsByTagName('td');" +
                 "            if (!headings || headings.length === 0) return;" +
-                "            var courseCodeIndex = -1, gradeIndex = -1, creditsIndex = -1, creditsSpan = 1;" +
+                "            var courseCodeIndex = -1, gradeIndex = -1;" +
                 "            for (var i = 0; i < headings.length; ++i) {" +
                 "                var heading = (headings[i].innerText || '').toLowerCase();" +
                 "                if (heading.includes('code')) {" +
                 "                    courseCodeIndex = i;" +
-                "                } else if (heading.includes('credits')) {" +
-                "                    creditsIndex = i;" +
-                "                    creditsSpan = headings[i].colSpan || 1;" +
                 "                } else if (heading.includes('grade')) {" +
                 "                    gradeIndex = i;" +
                 "                }" +
                 "            }" +
-                "            if (creditsIndex >= 0 && courseCodeIndex > creditsIndex) {" +
-                "                courseCodeIndex += creditsSpan - 1;" +
-                "            }" +
-                "            if (creditsIndex >= 0 && gradeIndex > creditsIndex) {" +
-                "                gradeIndex += creditsSpan - 1;" +
-                "            }" +
-                "            var cells = table.getElementsByTagName('td');" +
-                "            while(courseCodeIndex >= 0 && courseCodeIndex < cells.length && gradeIndex >= 0 && gradeIndex < cells.length) {" +
-                "                var grade = {};" +
-                "                grade.course_code = (cells[courseCodeIndex].innerText || '').trim();" +
-                "                grade.grade = (cells[gradeIndex].innerText || '').trim();" +
-                "                response.grades.push(grade);" +
-                "                courseCodeIndex += headings.length - 1;" +
-                "                gradeIndex += headings.length - 1;" +
+                "            var rows = table.rows;" +
+                "            for (var r = 1; r < rows.length; ++r) {" +
+                "                var cells = rows[r].querySelectorAll('td');" +
+                "                if (!cells || cells.length <= Math.max(courseCodeIndex, gradeIndex)) continue;" +
+                "                var cCode = courseCodeIndex >= 0 ? (cells[courseCodeIndex].innerText || '').trim() : '';" +
+                "                var cGrade = gradeIndex >= 0 ? (cells[gradeIndex].innerText || '').trim() : '';" +
+                "                if (cCode && cGrade) {" +
+                "                    response.grades.push({" +
+                "                        course_code: cCode," +
+                "                        grade: cGrade" +
+                "                    });" +
+                "                }" +
                 "            }" +
                 "            if (cells && cells.length > 0) {" +
                 "                var lastCellText = (cells[cells.length - 1].innerText || '').trim();" +
@@ -2130,9 +2172,13 @@ public class VTOPService extends Service {
                         JSONObject gradesObject = gradesArray.getJSONObject(i);
                         String courseCode = this.getStringValue(gradesObject, "course_code");
 
-                        if (courseCode != null && this.cumulativeMarks.containsKey(courseCode)) {
+                        if (courseCode != null) {
+                            if (!this.cumulativeMarks.containsKey(courseCode)) {
+                                this.cumulativeMarks.put(courseCode, new CumulativeMark(this.cumulativeMarks.size() + 1));
+                            }
                             CumulativeMark cm = this.cumulativeMarks.get(courseCode);
                             if (cm != null) {
+                                cm.courseCode = courseCode;
                                 cm.grade = this.getStringValue(gradesObject, "grade");
                             }
                         }
@@ -3322,6 +3368,70 @@ public class VTOPService extends Service {
                 Course c3 = this.theoryCourses.get(courseId);
                 return c3 != null ? c3.code : null;
         }
+    }
+
+    /**
+     * Function to resolve course ID by slot or course code fallback.
+     */
+    private Integer findCourseId(String courseCode, String slot, int courseType) {
+        Integer id = getCourseId(slot, courseType);
+        if (id != null) {
+            return id;
+        }
+        if (courseCode == null || courseCode.trim().isEmpty()) {
+            return null;
+        }
+        String cleanCode = courseCode.trim();
+        Map<Integer, Course> primary = (courseType == Course.TYPE_LAB) ? this.labCourses :
+                ((courseType == Course.TYPE_PROJECT) ? this.projectCourses : this.theoryCourses);
+        if (primary != null) {
+            for (Map.Entry<Integer, Course> entry : primary.entrySet()) {
+                if (entry.getValue() != null && cleanCode.equalsIgnoreCase(entry.getValue().code)) {
+                    return entry.getKey();
+                }
+            }
+        }
+        Map[] allMaps = new Map[]{this.theoryCourses, this.labCourses, this.projectCourses};
+        for (Map map : allMaps) {
+            if (map != null) {
+                for (Object value : map.values()) {
+                    if (value instanceof Course) {
+                        Course c = (Course) value;
+                        if (cleanCode.equalsIgnoreCase(c.code)) {
+                            return c.id;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Function to resolve course credits by courseId or courseCode fallback.
+     */
+    private Integer findCourseCredits(Integer courseId, String courseCode, int courseType) {
+        Integer credits = getCourseCredits(courseId, courseType);
+        if (credits != null) {
+            return credits;
+        }
+        if (courseCode != null && !courseCode.trim().isEmpty()) {
+            String cleanCode = courseCode.trim();
+            Map[] allMaps = new Map[]{this.theoryCourses, this.labCourses, this.projectCourses};
+            for (Map map : allMaps) {
+                if (map != null) {
+                    for (Object value : map.values()) {
+                        if (value instanceof Course) {
+                            Course c = (Course) value;
+                            if (cleanCode.equalsIgnoreCase(c.code) && c.credits != null) {
+                                return c.credits;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**

@@ -51,9 +51,11 @@ public class CumulativeMark {
     }
 
     public void addWeightage(Double weightageScore, Double maxWeightage, int courseType, Integer credits) {
-        if (weightageScore == null || credits == null) {
+        if (weightageScore == null) {
             return;
         }
+
+        int effectiveCredits = (credits != null && credits > 0) ? credits : 1;
 
         if (courseType == Course.TYPE_THEORY) {
             if (this.theoryTotal == null) {
@@ -65,7 +67,7 @@ public class CumulativeMark {
             if (maxWeightage != null) {
                 this.theoryMax += maxWeightage;
             }
-            this.theoryCredits = credits;
+            this.theoryCredits = effectiveCredits;
         } else if (courseType == Course.TYPE_LAB) {
             if (this.labTotal == null) {
                 this.labTotal = 0.0;
@@ -76,7 +78,7 @@ public class CumulativeMark {
             if (maxWeightage != null) {
                 this.labMax += maxWeightage;
             }
-            this.labCredits = credits;
+            this.labCredits = effectiveCredits;
         } else if (courseType == Course.TYPE_PROJECT) {
             if (this.projectTotal == null) {
                 this.projectTotal = 0.0;
@@ -87,7 +89,7 @@ public class CumulativeMark {
             if (maxWeightage != null) {
                 this.projectMax += maxWeightage;
             }
-            this.projectCredits = credits;
+            this.projectCredits = effectiveCredits;
         }
     }
 }

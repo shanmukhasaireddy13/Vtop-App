@@ -60,6 +60,10 @@ public class MarksAdapter extends RecyclerView.Adapter<MarksAdapter.ViewHolder> 
 
                     @Override
                     public void onNext(@io.reactivex.rxjava3.annotations.NonNull List<Mark.AllData> marks) {
+                        if (marks == null || marks.isEmpty()) {
+                            holder.displayEmptyState();
+                            return;
+                        }
                         holder.segregateMarks(marks);
                         holder.displayMarks();
                     }
@@ -192,6 +196,11 @@ public class MarksAdapter extends RecyclerView.Adapter<MarksAdapter.ViewHolder> 
 
         public void displayError(String errorMessage) {
             this.markGroups.setAdapter(new EmptyStateAdapter(EmptyStateAdapter.TYPE_ERROR, errorMessage));
+        }
+
+        public void displayEmptyState() {
+            this.courseTypes.removeAllViews();
+            this.markGroups.setAdapter(new EmptyStateAdapter(EmptyStateAdapter.TYPE_NO_PERFORMANCE));
         }
     }
 }

@@ -21,19 +21,24 @@ public class ResizeAnimation extends Animation {
     public ResizeAnimation(@NonNull View view, int animationDirection, int endValue, @NonNull JSONObject defaultValues) throws JSONException {
         ViewGroup.MarginLayoutParams layoutParams = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
 
+        int baseWidth = defaultValues.optInt("cardWidth", 1);
+        if (baseWidth <= 0) baseWidth = 1;
+
         this.animationDirection = animationDirection;
         this.width = view.getMeasuredWidth();
         this.height = view.getMeasuredHeight();
-        this.marginStart = layoutParams.getMarginStart();
-        this.marginEnd = layoutParams.getMarginEnd();
-        this.endMarginStart = defaultValues.getInt("marginStart") * endValue / defaultValues.getInt("cardWidth");
-        this.endMarginEnd = defaultValues.getInt("marginEnd") * endValue / defaultValues.getInt("cardWidth");
+        this.marginStart = layoutParams != null ? layoutParams.getMarginStart() : 0;
+        this.marginEnd = layoutParams != null ? layoutParams.getMarginEnd() : 0;
+        this.endMarginStart = defaultValues.optInt("marginStart", 0) * endValue / baseWidth;
+        this.endMarginEnd = defaultValues.optInt("marginEnd", 0) * endValue / baseWidth;
         this.endValue = endValue;
         this.view = view;
 
-        this.setDuration(200L * Math.abs(this.width - this.endValue) / defaultValues.getInt("cardWidth"));
+        this.setDuration(200L * Math.abs(this.width - this.endValue) / baseWidth);
         this.setInterpolator(new LinearInterpolator());
-        ((View) this.view.getParent()).invalidate();    // Animations don't work unless this is present
+        if (this.view.getParent() != null) {
+            ((View) this.view.getParent()).invalidate();    // Animations don't work unless this is present
+        }
     }
 
     @Override
